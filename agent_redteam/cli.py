@@ -12,6 +12,7 @@ from agent_redteam.adapters.base import MOCK_TARGETS, TargetNotAuthorizedError, 
 from agent_redteam.core.compare import compare_run_dirs, load_results_for_run
 from agent_redteam.core.runner import RunOptions, execute_run
 from agent_redteam.core.suite import SuiteError
+from agent_redteam.reports.dashboard import generate_dashboard
 from agent_redteam.reports.generate import generate_findings_csv, generate_markdown_report
 
 BUILTIN_SUITES = {
@@ -57,6 +58,10 @@ def _build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--runs-dir", default="runs", help="Directory containing run artifacts")
     rep.add_argument("--compare-to", default=None, help="Baseline run ID to diff against")
     rep.add_argument("--out", default="reports/out", help="Output directory for reports")
+
+    dash = sub.add_parser("dashboard", help="Generate an HTML dashboard from all runs")
+    dash.add_argument("--runs-dir", default="runs", help="Directory containing run artifacts")
+    dash.add_argument("--out", default="reports/out/dashboard.html", help="Output HTML path")
 
     sub.add_parser("list-attacks", help="List built-in adversarial suites")
     return p
@@ -181,6 +186,13 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    out = generate_dashboard(args.runs_dir, args.out)
+    runs = len(list(Path(args.runs_dir).glob("*/summary.json")))
+    print(f"Dashboard ({runs} run(s)): {out}")
+    return 0
+
+
 def cmd_list_attacks(_args: argparse.Namespace) -> int:
     print("Built-in suites:")
     for name, path in BUILTIN_SUITES.items():
@@ -195,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         "run": cmd_run,
         "compare": cmd_compare,
         "report": cmd_report,
+        "dashboard": cmd_dashboard,
         "list-attacks": cmd_list_attacks,
     }
     return handlers[args.command](args)
