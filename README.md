@@ -1,5 +1,8 @@
 # Agent Red-Teaming & Evaluation Framework
 
+![CI](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/badge/release-v1.0.0-blue)
+
 Reproducible adversarial testing and safety evaluation for AI agents.
 Built as an OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya**.
 Mentor: Anurag Sarkar.
@@ -19,7 +22,18 @@ Mentor: Anurag Sarkar.
 4. Aggregates **metrics** (attack success rate, violation rate, pass rate, per-category
    scores), builds **findings** with severity, and stores everything under `runs/<run_id>/`.
 5. **Compares** a run against a baseline to report regressions and improvements.
-6. Exports **Markdown + CSV reports** and exposes everything via a **CLI and REST API**.
+6. Exports **Markdown + CSV reports**, renders an **HTML dashboard** with run history and
+   trends, and exposes everything via a **CLI and REST API**.
+
+## Verified demo (mock targets, deterministic)
+
+| Target | Cases | Violations | Attack success rate | Pass rate | Exit code |
+|---|---|---|---|---|---|
+| `mock:weak` | 13 | **13** (6 critical, 6 high, 1 medium) | 100% | 0% | 1 |
+| `mock:strong` | 13 | **0** | 0% | 100% | 0 |
+
+Baseline comparison weak → strong: **0 regressions, 13 improvements**.
+Every violation carries captured evidence, reproduction steps and remediation guidance.
 
 ## Quickstart
 
@@ -37,11 +51,18 @@ agent-redteam compare --baseline <weak_run_id> --current <strong_run_id>
 # Generate Markdown + CSV reports
 agent-redteam report --run <run_id> [--compare-to <baseline_run_id>]
 
+# HTML dashboard: run history, trend charts, category breakdown, findings browser
+agent-redteam dashboard && open reports/out/dashboard.html
+
+# Measure throughput, latency and failure rates
+agent-redteam benchmark --target mock:weak --iterations 3 [--json]
+
 # List built-in suites and safe targets
 agent-redteam list-attacks
 ```
 
-`run` exits `1` when violations are found, so it can be used directly as a CI quality gate.
+`run` exits `1` when violations are found, so it can be used directly as a CI quality gate
+(PRD §2.2-6). `compare` exits `1` when regressions are detected.
 
 ## Testing an HTTP agent you own
 
@@ -93,7 +114,8 @@ test_cases:
 ```
 
 Malformed cases are rejected at load time with precise error messages —
-see `tests/test_suite.py` for the exact contract.
+see `tests/test_suite.py` for the exact contract. A commented example lives in
+[attacks_example/custom_suite.yaml](attacks_example/custom_suite.yaml).
 
 ## Metrics
 
@@ -103,6 +125,18 @@ see `tests/test_suite.py` for the exact contract.
 | `violation_rate` | violations / total cases |
 | `pass_rate` | (executed − violations) / total cases |
 | `by_category` | totals, violations, errors and violation rate per category |
+
+## Performance (measured)
+
+Framework overhead with deterministic mock targets, 13-case suite × 3 iterations:
+
+| Configuration | Throughput | p95 latency | Timeouts | Errors |
+|---|---|---|---|---|
+| `mock:weak` | ~18,250 cases/s | 0.005 ms | 0% | 0% |
+| `mock:strong` | ~18,413 cases/s | 0.005 ms | 0% | 0% |
+
+Report generation: ~1 ms · run artifacts: ~26 KB per 13-case run.
+Methodology and interpretation: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## REST API
 
@@ -122,23 +156,33 @@ POSTing an unauthorized external target is rejected synchronously with HTTP 400.
 
 ```
 agent_redteam/
-  core/        schemas, suite loading, execution engine, runner, metrics, compare
+  core/        schemas, suite loading, engine, runner, compare, benchmark harness
   adapters/    AgentAdapter interface, mock:weak / mock:strong, HTTP adapter
   evaluators/  deterministic rule evaluator, optional LLM-as-judge
-  attacks/     versioned adversarial suite (YAML)
-  reports/     Markdown + CSV report generators
+  attacks/     versioned adversarial suite (13 cases, 6 categories)
+  reports/     Markdown + CSV generators, HTML dashboard
   api/         FastAPI service
-  cli.py       run / compare / report / list-attacks
-tests/         76 pytest tests (unit, integration, API, safety)
-docs/          architecture, responsible use, roadmap
+  cli.py       run / compare / report / dashboard / benchmark / list-attacks
+attacks_example/  commented example for adding your own suites
+tests/         93 pytest tests (unit, integration, API, safety, benchmark)
+docs/          architecture (+ diagram), performance, responsible use, final report, roadmap
+scripts/       git history helper
 ```
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component diagram (Mermaid), pipeline, design decisions
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — benchmark methodology and measured results
+- [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) — PRD deliverables mapping with evidence
+- [docs/RESPONSIBLE_USE.md](docs/RESPONSIBLE_USE.md) — authorization rule, safety boundaries, evidence handling
+- [docs/ROADMAP.md](docs/ROADMAP.md) — shipped features and planned stretch goals
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
 ruff check .        # lint
-pytest              # tests
+pytest              # 93 tests
 docker build -t agent-redteam .
 docker run -p 8000:8000 agent-redteam
 ```
@@ -151,8 +195,9 @@ CI (GitHub Actions) runs ruff + pytest on Python 3.11/3.12/3.13 and verifies the
 - Deterministic policies are keyword/regex/allowlist based; semantic violations need the
   optional LLM judge, which adds nondeterminism even at temperature 0.
 - The API keeps the run registry in memory; artifacts under `runs/` are the durable store.
-- Multi-turn evaluation replays fixed scripted sequences; adaptive attack generation is
-  future work (see [docs/ROADMAP.md](docs/ROADMAP.md)).
+- Multi-turn evaluation replays fixed scripted sequences; adaptive attack generation,
+  memory-contamination tests and benchmark adapters are planned stretch goals
+  (see [docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## License
 
