@@ -63,6 +63,15 @@ def _build_parser() -> argparse.ArgumentParser:
     dash.add_argument("--runs-dir", default="runs", help="Directory containing run artifacts")
     dash.add_argument("--out", default="reports/out/dashboard.html", help="Output HTML path")
 
+    bench = sub.add_parser("benchmark", help="Measure throughput, latency and failure rates")
+    bench.add_argument("--suite", default="core", help="Built-in suite name or path to suite YAML/JSON")
+    bench.add_argument(
+        "--target", default="mock:weak", help="mock:weak | mock:strong | authorized http(s) URL"
+    )
+    bench.add_argument("--iterations", type=int, default=3, help="How many times to run the full suite")
+    bench.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout in seconds")
+    bench.add_argument("--json", action="store_true", dest="as_json", help="Print machine-readable JSON")
+
     sub.add_parser("list-attacks", help="List built-in adversarial suites")
     return p
 
@@ -193,6 +202,37 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_benchmark(args: argparse.Namespace) -> int:
+    from agent_redteam.core.benchmark import benchmark_suite
+
+    try:
+        adapter = resolve_target(args.target, allow_external=False, host_allowlist=None)
+        result = benchmark_suite(
+            _suite_path(args.suite),
+            adapter,
+            iterations=args.iterations,
+            timeout_s=args.timeout,
+        )
+    except (TargetNotAuthorizedError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    if args.as_json:
+        import dataclasses
+
+        print(json.dumps(dataclasses.asdict(result), indent=2))
+    else:
+        print(f"Benchmark: {result.total_cases} case executions "
+              f"({result.iterations} x {result.suite_path.split('/')[-1]}) against {result.target}")
+        print(f"  wall time        : {result.wall_time_s}s")
+        print(f"  throughput       : {result.cases_per_second} cases/s")
+        print(f"  avg latency      : {result.avg_latency_ms} ms")
+        print(f"  p95 latency      : {result.p95_latency_ms} ms")
+        print(f"  timeout rate     : {result.timeout_rate:.2%}")
+        print(f"  error rate       : {result.error_rate:.2%}")
+        print(f"  tool calls seen  : {result.tool_call_count}")
+    return 0
+
+
 def cmd_list_attacks(_args: argparse.Namespace) -> int:
     print("Built-in suites:")
     for name, path in BUILTIN_SUITES.items():
@@ -208,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         "compare": cmd_compare,
         "report": cmd_report,
         "dashboard": cmd_dashboard,
+        "benchmark": cmd_benchmark,
         "list-attacks": cmd_list_attacks,
     }
     return handlers[args.command](args)
