@@ -1,5 +1,61 @@
 # Architecture
 
+## Component diagram
+
+```mermaid
+graph TB
+    subgraph Interfaces
+        CLI["CLI<br/>run · compare · report · dashboard"]
+        API["FastAPI service<br/>POST /runs · GET /runs/{id}<br/>/results · /report · /healthz"]
+    end
+
+    subgraph Authorization["Safe-by-default authorization"]
+        RESOLVE["resolve_target()<br/>loopback always allowed ·<br/>external = explicit consent + host allowlist"]
+    end
+
+    subgraph Core
+        SUITE["Suite loader<br/>YAML/JSON · strict validation"]
+        ENGINE["Execution engine<br/>per-case timeout · rate limit ·<br/>per-case isolation"]
+        RUNNER["Runner / orchestrator<br/>execute → evaluate → findings<br/>→ metrics → persist"]
+        COMPARE["Compare<br/>regressions · improvements ·<br/>metric deltas"]
+    end
+
+    subgraph Adapters
+        MOCK["MockAgent<br/>mock:weak / mock:strong"]
+        HTTP["HTTPAgentAdapter<br/>owned endpoints only"]
+    end
+
+    subgraph Evaluators
+        DET["Deterministic evaluator<br/>refusal · keywords · regex ·<br/>tool allowlist"]
+        LLM["LLM-as-judge (optional)<br/>temperature 0 · JSON verdicts"]
+    end
+
+    subgraph Outputs
+        ART["runs/<run_id>/ artifacts<br/>summary · results · records"]
+        REPO["Reports<br/>Markdown · CSV"]
+        DASH["HTML dashboard<br/>history · trends · findings"]
+    end
+
+    CLI --> RESOLVE
+    API --> RESOLVE
+    RESOLVE --> MOCK
+    RESOLVE --> HTTP
+    CLI --> SUITE
+    SUITE --> ENGINE
+    ENGINE --> MOCK
+    ENGINE --> HTTP
+    RUNNER --> SUITE
+    RUNNER --> ENGINE
+    RUNNER --> DET
+    RUNNER --> LLM
+    RUNNER --> ART
+    RUNNER --> COMPARE
+    COMPARE --> ART
+    CLI --> REPO
+    CLI --> DASH
+    ART --> DASH
+```
+
 ## Evaluation pipeline
 
 ```

@@ -14,9 +14,16 @@
 - [x] Markdown + CSV reports
 - [x] CLI (`run`, `compare`, `report`, `list-attacks`) with CI-gate exit codes
 - [x] FastAPI service with synchronous authorization and background runs
-- [x] 76 pytest tests, ruff-clean, GitHub Actions CI, Dockerfile
+- [x] 93 pytest tests, ruff-clean, GitHub Actions CI, Dockerfile
+- [x] Benchmark harness + measured performance report (docs/PERFORMANCE.md)
 
-## Stretch goals (planned)
+### Delivered in v1.0.0 (post-release additions)
+
+- [x] HTML dashboard: history, trends, findings browser (`agent-redteam dashboard`)
+- [x] Final PRD deliverables report (docs/FINAL_REPORT.md)
+- [x] GitHub release v1.0.0
+
+# Stretch goals (planned)
 
 1. Adaptive attack generation / mutation (fuzzing-style broadening of coverage).
 2. Indirect injection via simulated retrieval & tool-output pipelines.
