@@ -11,6 +11,7 @@ from agent_redteam import __version__
 from agent_redteam.adapters.base import MOCK_TARGETS, TargetNotAuthorizedError, resolve_target
 from agent_redteam.core.compare import compare_run_dirs, load_results_for_run
 from agent_redteam.core.runner import RunOptions, execute_run
+from agent_redteam.core.schemas import ATTACK_CATEGORIES
 from agent_redteam.core.suite import SuiteError
 from agent_redteam.reports.dashboard import generate_dashboard
 from agent_redteam.reports.generate import generate_findings_csv, generate_markdown_report
@@ -71,6 +72,65 @@ def _build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--iterations", type=int, default=3, help="How many times to run the full suite")
     bench.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout in seconds")
     bench.add_argument("--json", action="store_true", dest="as_json", help="Print machine-readable JSON")
+
+    gen = sub.add_parser(
+        "generate",
+        help="Generate new adversarial cases (LLM proposals or deterministic mutations)",
+    )
+    gen.add_argument(
+        "--category",
+        required=True,
+        choices=list(ATTACK_CATEGORIES),
+        help="Attack category to generate cases for",
+    )
+    gen.add_argument("--count", type=int, default=5, help="How many cases to generate (max 50)")
+    gen.add_argument(
+        "--mode",
+        choices=("auto", "llm", "mutate"),
+        default="auto",
+        help="auto = LLM when configured, otherwise deterministic mutations",
+    )
+    gen.add_argument("--seed", type=int, default=0, help="Random seed for reproducible mutations")
+    gen.add_argument(
+        "--seed-suite",
+        default="core",
+        help="Built-in suite name or path providing seed cases",
+    )
+    gen.add_argument("--timeout", type=float, default=60.0, help="LLM call timeout in seconds")
+    gen.add_argument(
+        "--out",
+        default="attacks_generated/gen_suite.yaml",
+        help="Output suite YAML path",
+    )
+
+    ada = sub.add_parser(
+        "adaptive",
+        help="Closed-loop red-teaming: the agent plans, generates, attacks and reflects",
+    )
+    ada.add_argument("--target", default="mock:weak", help="mock:weak | mock:strong | authorized http(s) URL")
+    ada.add_argument(
+        "--allow-external", action="store_true",
+        help="Explicitly authorize testing an external (non-loopback) HTTP target",
+    )
+    ada.add_argument(
+        "--allowed-hosts", default="",
+        help="Comma-separated host allowlist required for non-loopback external targets",
+    )
+    ada.add_argument("--max-rounds", type=int, default=5, help="Plan/generate/attack cycles (cap 20)")
+    ada.add_argument("--cases-per-round", type=int, default=8, help="Generated cases per round (cap 50)")
+    ada.add_argument("--suite", default="core", help="Seed suite (built-in name or path)")
+    ada.add_argument(
+        "--mode", choices=("auto", "llm", "mutate"), default="auto",
+        help="Generation mode (auto = LLM if configured, else deterministic mutations)",
+    )
+    ada.add_argument("--seed", type=int, default=0, help="Seed for reproducible generation")
+    ada.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout seconds")
+    ada.add_argument("--rate-limit", type=float, default=0.0, help="Seconds between sends")
+    ada.add_argument("--out", default="runs", help="Directory for run artifacts")
+    ada.add_argument(
+        "--json", action="store_true", dest="as_json",
+        help="Print the adaptive report as JSON",
+    )
 
     sub.add_parser("list-attacks", help="List built-in adversarial suites")
     return p
@@ -233,6 +293,94 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generate(args: argparse.Namespace) -> int:
+    from agent_redteam.core.generator import GeneratorError, generate_suite, save_suite
+    from agent_redteam.core.suite import load_suite
+
+    try:
+        seeds = load_suite(_suite_path(args.seed_suite))
+    except SuiteError as exc:
+        print(f"ERROR: invalid seed suite: {exc}", file=sys.stderr)
+        return 2
+    try:
+        cases, errors, mode_used = generate_suite(
+            args.category,
+            args.count,
+            seeds,
+            mode=args.mode,
+            seed=args.seed,
+            timeout_s=args.timeout,
+        )
+    except GeneratorError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    if errors:
+        print(f"Rejected {len(errors)} proposal(s):", file=sys.stderr)
+        for err in errors:
+            print(err, file=sys.stderr)
+    if not cases:
+        print("ERROR: no valid cases generated", file=sys.stderr)
+        return 1
+    out = save_suite(cases, args.out)
+    print(f"Generated {len(cases)} {args.category} case(s) via {mode_used} mode: {out}")
+    print("Review the file, then run: agent-redteam run --suite", out, "--target mock:weak")
+    return 0
+
+
+def cmd_adaptive(args: argparse.Namespace) -> int:
+    from agent_redteam.core.adaptive import AdaptiveLimit, run_adaptive
+
+    try:
+        adapter = resolve_target(
+            args.target,
+            allow_external=args.allow_external,
+            host_allowlist=[h.strip() for h in args.allowed_hosts.split(",") if h.strip()] or None,
+        )
+    except (TargetNotAuthorizedError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    report = run_adaptive(
+        adapter,
+        _suite_path(args.suite),
+        limits=AdaptiveLimit(max_rounds=args.max_rounds, cases_per_round=args.cases_per_round),
+        run_options=RunOptions(
+            rate_limit_s=args.rate_limit,
+            timeout_s=args.timeout,
+            output_dir=Path(args.out),
+        ),
+        generation_mode=args.mode,
+        rng_seed=args.seed,
+    )
+
+    # Same CI-gate contract as `run`: exit 1 when violations were found.
+    exit_code = 1 if report.total_violations else 0
+
+    if args.as_json:
+        import dataclasses
+
+        print(json.dumps(dataclasses.asdict(report), indent=2, default=str))
+        return exit_code
+
+    print(f"Adaptive red-team loop against {report.target} — {len(report.rounds)} round(s) executed")
+    for r in report.rounds:
+        print(f"\n[Round {r.round_no}] PLAN   {r.plan}")
+        print(f"           GENERATE {r.generated} case(s) via {r.mode_used} for {r.planned_category}"
+              + (f" ({r.rejected} rejected)" if r.rejected else ""))
+        if r.rejected_reasons:
+            for err in r.rejected_reasons[:5]:
+                print(f"             rejected: {err.strip()}")
+        print(f"           ATTACK  run {r.run_id or '—'}: executed={r.executed} violations={r.violations}")
+        print(f"           REFLECT {r.decision}  ({r.elapsed_s:.2f}s, suite {r.suite_path or '—'})")
+    print(f"\nStopped: {report.stopped_reason}")
+    print(
+        f"Totals: generated={report.total_generated} rejected={report.total_rejected} "
+        f"executed={report.total_executed} violations={report.total_violations}"
+    )
+    print(f"Categories probed: {', '.join(report.categories_attacked)}")
+    return exit_code
+
+
 def cmd_list_attacks(_args: argparse.Namespace) -> int:
     print("Built-in suites:")
     for name, path in BUILTIN_SUITES.items():
@@ -249,6 +397,8 @@ def main(argv: list[str] | None = None) -> int:
         "report": cmd_report,
         "dashboard": cmd_dashboard,
         "benchmark": cmd_benchmark,
+        "generate": cmd_generate,
+        "adaptive": cmd_adaptive,
         "list-attacks": cmd_list_attacks,
     }
     return handlers[args.command](args)
