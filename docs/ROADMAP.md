@@ -14,7 +14,7 @@
 - [x] Markdown + CSV reports
 - [x] CLI (`run`, `compare`, `report`, `list-attacks`) with CI-gate exit codes
 - [x] FastAPI service with synchronous authorization and background runs
-- [x] 93 pytest tests, ruff-clean, GitHub Actions CI, Dockerfile
+- [x] 145 pytest tests, ruff-clean, GitHub Actions CI, Dockerfile
 - [x] Benchmark harness + measured performance report (docs/PERFORMANCE.md)
 
 ### Delivered in v1.0.0 (post-release additions)
@@ -25,7 +25,15 @@
 
 # Stretch goals (planned)
 
-1. Adaptive attack generation / mutation (fuzzing-style broadening of coverage).
+1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~
+   Shipped: `agent-redteam generate` (LLM proposals when `AGENT_REDTEAM_LLM_*` configured,
+   else deterministic mutations of the seed suite), every case gated through `TestCase`
+   validation with server-side derived policies and a ≤50/request budget.
+   Still planned on top: LLM-judge adjudication of obfuscated-input non-refusals.
+   Shipped on top of that: `agent-redteam adaptive` — the closed-loop red-teaming agent
+   (plan → generate → attack → reflect with a ReAct-style trace), deterministic weakest-
+   category planner, hard budgets (≤20 rounds, ≤50 cases/round, unique ids across rounds),
+   persisted per-round suites, and the same CI exit-code contract as `run`.
 2. Indirect injection via simulated retrieval & tool-output pipelines.
 3. Memory & cross-session contamination tests.
 4. Web dashboard for historical scores, trends and regressions.

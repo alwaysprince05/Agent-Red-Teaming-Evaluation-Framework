@@ -21,8 +21,14 @@ Mentor: Anurag Sarkar.
    LLM-as-judge) and captures **evidence** for every violation.
 4. Aggregates **metrics** (attack success rate, violation rate, pass rate, per-category
    scores), builds **findings** with severity, and stores everything under `runs/<run_id>/`.
-5. **Compares** a run against a baseline to report regressions and improvements.
-6. Exports **Markdown + CSV reports**, renders an **HTML dashboard** with run history and
+5. **Generates** new adversarial cases adaptively: the **closed-loop agent** decides what
+   to attack next (plan → generate → attack → reflect, with a ReAct-style trace), proposing
+   LLM attacks or deterministic mutations of the seed suite — every case gated through the
+   same `TestCase` validation, with server-side derived policies and hard budgets
+   (≤50 cases/request, ≤20 rounds).
+6. **Compares** a run against a baseline to report regressions and improvements.
+7. **Exports** Markdown + CSV reports, renders an **HTML dashboard** with run history and
+   trends, and exposes everything via a **CLI and REST API**.
    trends, and exposes everything via a **CLI and REST API**.
 
 ## Verified demo (mock targets, deterministic)
@@ -50,6 +56,16 @@ agent-redteam compare --baseline <weak_run_id> --current <strong_run_id>
 
 # Generate Markdown + CSV reports
 agent-redteam report --run <run_id> [--compare-to <baseline_run_id>]
+
+# Adaptive attack generation: agent decides new cases instead of a hardcoded suite
+# (offline deterministic mutations by default; set AGENT_REDTEAM_LLM_* for LLM proposals)
+agent-redteam generate --category jailbreak --count 5 --seed 42 --out attacks_generated/gen.yaml
+agent-redteam run --suite attacks_generated/gen.yaml --target mock:weak
+
+# Adaptive closed-loop red-team agent: plan -> generate -> attack -> reflect, repeated
+# until budget or stop condition. The agent decides what to probe next and shows its trace.
+agent-redteam adaptive --target mock:weak --max-rounds 3 --cases-per-round 5
+agent-redteam adaptive --target mock:weak --max-rounds 3 --json   # machine-readable report
 
 # HTML dashboard: run history, trend charts, category breakdown, findings browser
 agent-redteam dashboard && open reports/out/dashboard.html
@@ -156,7 +172,7 @@ POSTing an unauthorized external target is rejected synchronously with HTTP 400.
 
 ```
 agent_redteam/
-  core/        schemas, suite loading, engine, runner, compare, benchmark harness
+  core/        schemas, suite loading, generator, adaptive agent, engine, runner, compare, benchmark
   adapters/    AgentAdapter interface, mock:weak / mock:strong, HTTP adapter
   evaluators/  deterministic rule evaluator, optional LLM-as-judge
   attacks/     versioned adversarial suite (13 cases, 6 categories)
@@ -164,7 +180,7 @@ agent_redteam/
   api/         FastAPI service
   cli.py       run / compare / report / dashboard / benchmark / list-attacks
 attacks_example/  commented example for adding your own suites
-tests/         93 pytest tests (unit, integration, API, safety, benchmark)
+tests/         145 pytest tests (unit, integration, API, safety, benchmark, generator, adaptive)
 docs/          architecture (+ diagram), performance, responsible use, final report, roadmap
 scripts/       git history helper
 ```
@@ -182,7 +198,7 @@ scripts/       git history helper
 ```bash
 pip install -e ".[dev]"
 ruff check .        # lint
-pytest              # 93 tests
+pytest              # 145 tests
 docker build -t agent-redteam .
 docker run -p 8000:8000 agent-redteam
 ```
