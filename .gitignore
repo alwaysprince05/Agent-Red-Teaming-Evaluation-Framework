@@ -15,6 +15,7 @@ venv/
 # run artifacts (evidence stays local)
 runs/
 reports/out/
+attacks_generated/
 
 # tooling
 .pytest_cache/
