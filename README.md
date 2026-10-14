@@ -45,7 +45,7 @@ Every violation carries captured evidence, reproduction steps and remediation gu
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"      # or: pip install -r requirements.txt
 
 # Demo: evaluate the vulnerable mock agent, then the hardened one
 agent-redteam run --suite core --target mock:weak
@@ -157,7 +157,8 @@ Methodology and interpretation: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 ## REST API
 
 ```bash
-uvicorn agent_redteam.api.main:app --reload
+python app.py    # binds 127.0.0.1:8000; see app.py docstring for host/port/worker env vars
+# or: uvicorn agent_redteam.api.main:app --reload
 
 curl -X POST localhost:8000/runs -H 'Content-Type: application/json' \
   -d '{"suite": "core", "target": "mock:weak"}'
@@ -196,7 +197,7 @@ scripts/       git history helper
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -r requirements.txt    # or: pip install -e ".[dev]"
 ruff check .        # lint
 pytest              # 145 tests
 docker build -t agent-redteam .
