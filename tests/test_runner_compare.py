@@ -1,3 +1,21 @@
+"""Tests for Runner & Compare — Checks the full pipeline and run comparison.
+
+Tests in this file verify:
+
+  Runner tests:
+    - A full evaluation run completes successfully end-to-end.
+    - Run artifacts (summary.json, results.json, records.json) are saved correctly.
+    - Metrics are calculated accurately (attack success rate, pass rate, etc.).
+    - The weak agent produces findings (violations detected).
+    - The strong agent produces zero findings (all tests passed).
+
+  Compare tests:
+    - Comparing a weak run (baseline) to a strong run (current) shows improvements.
+    - Comparing a strong run (baseline) to a weak run (current) shows regressions.
+    - Comparing a run with itself shows no changes.
+    - Metric deltas are calculated correctly (e.g., pass rate improvement).
+"""
+
 import json
 
 import pytest

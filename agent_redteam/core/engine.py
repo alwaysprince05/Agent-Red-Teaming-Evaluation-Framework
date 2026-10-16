@@ -1,9 +1,18 @@
-"""Execution engine: runs test cases against a target with safety controls.
+"""Execution Engine — Runs individual test cases against an AI agent safely.
 
-Safety controls implemented here:
-  - per-case wall-clock timeout (thread-based, daemonized);
-  - global rate limit between consecutive sends;
-  - per-case isolation (each case gets a fresh conversation and record).
+This file handles the actual execution of each test case. It sends the attack
+prompt to the agent and captures the response, with built-in safety controls:
+
+Safety controls:
+  - Timeout: Each test case has a time limit (default 15 seconds). If the agent
+    takes too long, the test is marked as "timeout" instead of hanging forever.
+  - Rate limiting: A small delay between consecutive requests prevents flooding
+    the target agent (default 0.2 seconds between sends).
+  - Isolation: Each test case gets a completely fresh conversation. One test
+    can never affect another.
+
+The engine does NOT evaluate whether the response is safe — that's the
+evaluator's job. The engine just runs the test and records what happened.
 """
 
 from __future__ import annotations

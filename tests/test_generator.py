@@ -1,3 +1,17 @@
+"""Tests for Generator — Checks automatic attack case creation.
+
+Tests in this file verify:
+  - Mutation mode creates new cases from existing seed cases.
+  - All mutation types work (base64, roleplay, authority, session, split, obfuscated).
+  - Generated cases pass validation (correct format, valid IDs, proper categories).
+  - Policies are always derived server-side (never from generator output).
+  - Budget limits are enforced (max 50 cases per request).
+  - Invalid proposals are dropped with clear error messages.
+  - Duplicate IDs are detected and rejected.
+  - LLM mode parsing handles valid JSON, markdown-wrapped JSON, and broken output.
+  - The save_suite function writes valid YAML loadable by load_suite.
+"""
+
 import json
 
 import pytest

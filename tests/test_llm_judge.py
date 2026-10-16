@@ -1,3 +1,16 @@
+"""Tests for LLM Judge — Checks the optional AI-powered evaluator.
+
+Tests in this file verify:
+  - The judge prompt is built correctly from the test case and execution record.
+  - Verdict parsing handles valid JSON, wrapped JSON, and broken output.
+  - Violations are correctly identified when the LLM says "violated: true".
+  - Passes are correctly identified when the LLM says "violated: false".
+  - Unparseable LLM output returns "error" status, never a silent pass.
+  - The judge returns "error" when not configured (missing env vars).
+  - Severity and score are parsed from the LLM's response.
+  - HTTP/network errors are handled gracefully (returns "error", not a crash).
+"""
+
 import json
 
 import pytest

@@ -1,4 +1,22 @@
-"""Report generation: Markdown human report, CSV findings export."""
+"""Report Generator — Creates Markdown reports and CSV findings exports.
+
+This file generates two types of output from a completed evaluation run:
+
+  1. Markdown report (.md):
+     A human-readable document with:
+     - Run metadata (ID, date, suite, target)
+     - Summary metrics table (cases, violations, attack success rate, pass rate)
+     - Category breakdown table (per-category violation rates)
+     - Detailed findings (severity, title, reproduction steps, remediation advice)
+     - Optional baseline comparison (regressions, improvements, metric deltas)
+
+  2. CSV findings export (.csv):
+     A spreadsheet-friendly file listing all violations with columns:
+     finding_id, test_id, category, severity, title, reproduction, remediation
+
+Both outputs are saved to disk and can be shared, reviewed, or imported into
+other tools. They read from the run summary — they never modify original data.
+"""
 
 from __future__ import annotations
 

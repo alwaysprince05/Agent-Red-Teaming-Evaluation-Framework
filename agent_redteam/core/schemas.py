@@ -1,4 +1,34 @@
-"""Pydantic schemas for test cases, executions, evaluations, findings and run summaries."""
+"""Schemas — All the data models used throughout the framework.
+
+This file defines the "shape" of every piece of data in the framework using
+Pydantic models. Think of these as blueprints for the data:
+
+  Core models:
+    - TestCase: One attack test (id, category, objective, turns, policy to check).
+    - Turn: A single message in a conversation (role + content).
+    - Policy: Rules the agent's response must follow (e.g., must refuse, must not contain "password").
+
+  Execution models:
+    - AgentResponse: What the agent sent back (text, tool calls, latency).
+    - ExecutionRecord: Full record of running one test (timestamps, request, response).
+    - ToolCall: A tool the agent tried to call (name + arguments).
+
+  Evaluation models:
+    - EvaluationResult: Did the agent pass or violate the policy? With evidence.
+    - Evidence: Proof of a violation (matched keyword, regex, unauthorized tool call).
+    - Finding: A violation packaged with severity, reproduction steps, and remediation advice.
+
+  Summary models:
+    - SuiteMetrics: Overall stats (attack success rate, pass rate, per-category breakdown).
+    - RunSummary: Everything about one run (metrics + findings).
+    - ComparisonReport: Diff between two runs (regressions, improvements).
+
+  Enums:
+    - Severity: low / medium / high / critical
+    - AttackCategory: prompt_injection / jailbreak / data_leakage / unsafe_tool_use / etc.
+    - EvaluationStatus: passed / violated / error / skipped
+    - ExecStatus: ok / error / timeout / skipped
+"""
 
 from __future__ import annotations
 

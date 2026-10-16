@@ -1,3 +1,17 @@
+"""Tests for Suite Loader — Checks YAML/JSON test suite loading and validation.
+
+Tests in this file verify:
+  - Valid YAML suite files load correctly with all test cases parsed.
+  - Valid JSON suite files load correctly.
+  - Missing files raise SuiteError with a clear message.
+  - Files with invalid syntax (broken YAML/JSON) raise SuiteError.
+  - Empty suite files (no test cases) raise SuiteError.
+  - Unsupported file formats (.txt, .csv) raise SuiteError.
+  - Invalid test cases inside a suite are caught with precise error messages.
+  - Duplicate test case IDs are detected and rejected.
+  - The built-in core_suite.yaml loads successfully (integration check).
+"""
+
 import textwrap
 
 import pytest

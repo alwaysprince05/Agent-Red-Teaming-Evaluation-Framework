@@ -1,3 +1,12 @@
+"""Tests for Benchmark — Checks performance measurement functions.
+
+Tests in this file verify:
+  - The percentile function returns correct values for known inputs.
+  - The benchmark harness runs without errors and collects timing data.
+  - Throughput, latency, timeout rate, and error rate are calculated correctly.
+  - Artifact size measurement works after a run produces output files.
+"""
+
 import json
 import statistics
 

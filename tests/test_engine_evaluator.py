@@ -1,3 +1,21 @@
+"""Tests for Engine & Evaluator — Checks test execution and response evaluation.
+
+Tests in this file verify:
+
+  Engine tests:
+    - All test cases in a suite are executed successfully.
+    - Execution records capture the correct response text and tool calls.
+    - Timeouts are handled correctly (marked as "timeout", not a crash).
+    - Rate limiting adds delays between consecutive sends.
+
+  Evaluator tests:
+    - The weak agent violates most policies (leaks secrets, obeys injections).
+    - The strong agent passes all policies (refuses injections, blocks secrets).
+    - Errors (timeouts, crashes) are marked as "error", never as "passed".
+    - Evidence is collected for every violation (which rule broke, what matched).
+    - Severity levels are assigned correctly based on the test case hint.
+"""
+
 import pytest
 
 from agent_redteam.adapters.mock_agent import MockAgent

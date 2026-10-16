@@ -1,18 +1,26 @@
-"""Adaptive attack generation: propose new adversarial test cases and validate them.
+"""Generator — Creates new attack test cases automatically.
 
-Safety/quality constraints (mirrors ``evaluators/llm_judge.py``):
-  - every proposal is validated through the same ``TestCase`` model used by
-    ``suite.load_suite``; invalid proposals are dropped with precise errors;
-  - policies are derived server-side from the category — generated content can
-    never author or weaken its own grading rules;
-  - a hard per-request budget (``MAX_GENERATED_CASES``) caps how many cases can
-    be proposed at once;
-  - this module has no notion of a *target*: run authorization stays in
-    ``runner``/``api`` exactly as before;
-  - LLM mode uses temperature=0 (reproducible) and any failure raises
-    ``GeneratorError`` — never a silent pass. Offline mode uses deterministic
-    mutations of a seed suite so the framework keeps working with no LLM
-    configured.
+This file generates new adversarial test cases so you don't have to write
+them all by hand. It has two modes:
+
+  1. Mutation mode (default, works offline):
+     Takes existing test cases and transforms them using tricks like:
+     - Encoding the attack in base64
+     - Wrapping it in a roleplay ("You are DAN...")
+     - Faking admin authority ("SYSTEM OVERRIDE...")
+     - Splitting across multiple messages
+     - Adding typo obfuscation ("h3ll0" instead of "hello")
+
+  2. LLM mode (optional, needs API key):
+     Asks a language model to propose brand new attack cases.
+     Uses temperature=0 for reproducibility. Any failure is raised as
+     an error — never silently ignored.
+
+Safety rules:
+  - Every generated case is validated through the same rules as hand-written tests.
+  - Policies (the grading rules) are always set by the framework, never by the generator.
+  - A hard limit of 50 cases per request prevents abuse.
+  - Generated cases never contain real credentials or harmful content.
 """
 
 from __future__ import annotations

@@ -1,4 +1,16 @@
-"""Benchmark harness (PRD 3.3 performance): throughput, latency, artifact and report timing."""
+"""Benchmark — Measures how fast the framework runs.
+
+This file tests the performance of the framework itself. It runs the same
+test suite multiple times and measures:
+  - Throughput: How many test cases per second can it process?
+  - Latency: How long does each test case take on average? What's the worst case (p95)?
+  - Timeout rate: What percentage of cases timed out?
+  - Error rate: What percentage of cases had errors?
+  - Tool call count: How many tool calls were made in total?
+
+It can also measure how long report generation takes and how big the saved files are.
+This is useful for making sure the framework stays fast as it grows.
+"""
 
 from __future__ import annotations
 

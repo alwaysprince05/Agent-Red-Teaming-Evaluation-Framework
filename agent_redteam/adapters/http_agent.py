@@ -1,6 +1,21 @@
-"""HTTP adapter for an agent endpoint you own or are authorized to test.
+"""HTTP Agent Adapter — Sends attack prompts to a real AI agent over the network.
 
-Expected minimal contract (fully configurable in code later):
+This file lets the framework test a real AI agent that runs on a web server.
+It sends conversation messages via HTTP POST and reads back the agent's reply.
+
+How it works:
+  1. Takes the attack prompt (a list of conversation turns).
+  2. Sends it as a JSON POST request to the agent's URL.
+  3. Reads the agent's response (text + any tool calls it made).
+  4. Returns the response so the evaluator can check if the agent was safe.
+
+Error handling:
+  - If the agent takes too long, it returns a timeout error.
+  - If the HTTP request fails, it returns an HTTP error.
+  - If the response is not valid JSON, it returns a parse error.
+  - Errors are never hidden — they are always recorded.
+
+Expected API format from the target agent:
   POST <url>   {"messages": [{"role": "user", "content": "..."}, ...]}
   -> 200 {"text": "...", "tool_calls": [{"name": ..., "arguments": {...}}]}
 """

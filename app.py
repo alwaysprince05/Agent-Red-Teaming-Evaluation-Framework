@@ -1,19 +1,24 @@
-"""Application entrypoint.
+"""App Entry Point — Starts the web server for the red-teaming REST API.
 
-Starts the red-teaming REST API with uvicorn. Configuration is taken from
-environment variables so the same code runs in development and production:
+This is the file you run to start the web server:
+    python app.py
 
-    AGENT_REDTEAM_HOST     bind address           (default 127.0.0.1)
-    AGENT_REDTEAM_PORT     bind port              (default 8000)
-    AGENT_REDTEAM_WORKERS  number of workers      (default 1)
+It launches the FastAPI application using uvicorn (a fast Python web server).
+Once running, you can:
+  - Open http://127.0.0.1:8000/docs for the interactive Swagger UI.
+  - Send HTTP requests to start evaluation runs, check status, and get results.
+
+Configuration (via environment variables):
+    AGENT_REDTEAM_HOST     — What address to listen on (default: 127.0.0.1)
+    AGENT_REDTEAM_PORT     — What port to use (default: 8000)
+    AGENT_REDTEAM_WORKERS  — How many worker processes to run (default: 1)
+    AGENT_REDTEAM_RELOAD   — Enable auto-reload for development (only with 1 worker)
 
 Examples:
+    python app.py                                              # development
+    AGENT_REDTEAM_HOST=0.0.0.0 AGENT_REDTEAM_PORT=8000 python app.py  # production
 
-    python app.py                       # development
-    AGENT_REDTEAM_HOST=0.0.0.0 AGENT_REDTEAM_PORT=8000 python app.py
-
-The API refuses external agent targets unless a request explicitly sets
-allow_external_targets plus an allowed_hosts entry (see docs/RESPONSIBLE_USE.md).
+Safety: The API refuses external agent targets unless you explicitly allow them.
 """
 
 from __future__ import annotations

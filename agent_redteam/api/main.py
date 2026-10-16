@@ -1,7 +1,24 @@
-"""FastAPI service for starting and monitoring evaluation runs.
+"""API Main — The FastAPI web server for the red-teaming framework.
 
-Safe by default: external HTTP targets require allow_external_targets=true and,
-for non-loopback hosts, an entry in allowed_hosts.
+This file defines the REST API that lets you control evaluations over HTTP.
+Instead of using the command line, you can send HTTP requests to start runs,
+check their status, and download results.
+
+How it works:
+  1. POST /runs — You send a request with the target and suite to test.
+     The server validates the target, then starts the evaluation in a background thread.
+     It returns a run_id you can use to check progress.
+
+  2. GET /runs/{run_id} — Check if the run is still "running", "completed", or "failed".
+
+  3. GET /runs/{run_id}/results — Get the full evaluation results (pass/fail per test case).
+
+  4. GET /runs/{run_id}/report — Get a Markdown report and CSV of findings.
+
+  5. GET /healthz — A simple health check to verify the server is up.
+
+Safety: External (non-localhost) targets are rejected with HTTP 400 unless
+explicitly authorized with allow_external_targets and allowed_hosts.
 """
 
 from __future__ import annotations

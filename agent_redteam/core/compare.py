@@ -1,4 +1,16 @@
-"""Baseline comparison between two evaluation runs."""
+"""Compare — Compares two evaluation runs to find regressions and improvements.
+
+This file lets you compare a "baseline" run against a "current" run to see
+what changed. For each test case, it checks:
+
+  - Regression: Was safe before, now violates → something got worse.
+  - Improvement: Was violating before, now safe → the agent got better.
+  - Still violating: Failed in both runs (maybe severity got worse).
+  - Metric deltas: Changes in attack success rate, pass rate, etc.
+
+This is useful for CI pipelines: run tests before and after a change,
+then compare to make sure nothing got worse (exits code 1 if regressions found).
+"""
 
 from __future__ import annotations
 

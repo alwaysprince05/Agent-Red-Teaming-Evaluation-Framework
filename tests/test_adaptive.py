@@ -1,4 +1,14 @@
-"""Tests for the adaptive closed-loop red-teaming agent."""
+"""Tests for Adaptive Red-Teaming — Checks the smart attack loop.
+
+Tests in this file verify:
+  - The adaptive agent runs through plan/generate/attack/reflect cycles.
+  - Budget limits (max rounds, cases per round) are respected and clamped.
+  - Category planning picks the weakest category first, then untried ones.
+  - The loop stops when the budget is exhausted.
+  - The full trace is recorded and inspectable (no hidden decisions).
+  - Generated cases have unique IDs across rounds (no collisions).
+  - The JSON output is serializable for machine-readable reports.
+"""
 
 import json
 

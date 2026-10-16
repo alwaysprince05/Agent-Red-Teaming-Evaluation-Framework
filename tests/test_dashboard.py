@@ -1,3 +1,15 @@
+"""Tests for Dashboard — Checks the HTML dashboard generation.
+
+Tests in this file verify:
+  - discover_runs() finds all run summaries in a directory.
+  - Runs are returned in chronological order (oldest first).
+  - generate_dashboard() creates a valid HTML file.
+  - The HTML contains expected sections (summary cards, history, trends, findings).
+  - SVG trend charts are rendered with correct data points.
+  - All findings from all runs appear in the output.
+  - The dashboard handles multiple runs correctly.
+"""
+
 import json
 from pathlib import Path
 

@@ -1,7 +1,22 @@
-"""HTML dashboard: run history, category trends and findings from runs/ artifacts.
+"""Dashboard — Builds a visual HTML dashboard from evaluation run data.
 
-Reads existing run directories (runs/<run_id>/summary.json) and renders a
-self-contained, dependency-free HTML page. Read-only: it never modifies runs.
+This file generates a single, self-contained HTML page (no dependencies, no
+JavaScript frameworks) that shows all your evaluation results at a glance.
+
+Dashboard sections:
+  - Summary cards: Total runs, cases executed, violations, latest attack success rate.
+  - History table: All runs with target, case counts, violation counts, and pass-rate bars.
+  - Trend charts: SVG line graphs showing attack success rate and pass rate over time.
+  - Category breakdown: Per-category violation rates for the latest run.
+  - Findings browser: All findings listed with severity badges, categories, and test IDs.
+
+How it works:
+  1. Scans the runs/ directory for summary.json files.
+  2. Loads each run's summary data.
+  3. Renders everything into a dark-themed HTML page.
+  4. Saves it as a single .html file you can open in any browser.
+
+The dashboard is read-only — it never modifies run artifacts.
 """
 
 from __future__ import annotations

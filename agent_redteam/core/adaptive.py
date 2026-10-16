@@ -1,23 +1,21 @@
-"""Adaptive red-teaming loop: the attacking agent decides what to try next.
+"""Adaptive Red-Teaming — A smart attacking agent that decides what to test next.
 
-Closed-loop pipeline executed as plan → generate → run → reflect, repeating until
-a budget or stop condition triggers:
+This file runs an automated attack loop that keeps trying to find weaknesses
+in an AI agent. Instead of running a fixed list of tests, it thinks and adapts:
 
-  1. **Plan**     — pick the next category to target (weakest first, or untried).
-  2. **Generate** — propose new attack cases for that category
-                    (mutate mode default; LLM mode when configured).
-  3. **Run**      — execute the round's cases through the normal engine/evaluator.
-  4. **Reflect**  — update per-category violation intel and decide whether
-                    another round can help.
+The loop (repeats up to a budget limit):
+  1. PLAN    — Look at past results and pick the weakest category to attack next.
+               (e.g., if "jailbreak" attacks worked before, try more of those)
+  2. GENERATE — Create new attack test cases for that category.
+               (uses deterministic mutations by default, or an LLM if configured)
+  3. ATTACK  — Run the generated tests against the target agent.
+  4. REFLECT — Check the results and decide: keep going or stop?
 
-Design & safety constraints:
-  - adapter/target selection stays exactly where it is (CLI ``resolve_target``);
-    this loop never chooses or authorizes targets — you hand it a live adapter;
-  - per-run budget caps rounds and total generated cases (no unbounded loops);
-  - every generated case passes the same ``TestCase`` validation gate;
-  - trace is fully reported (ReAct-style), no hidden state;
-  - LLM calls are temperature=0, strict JSON; any LLM failure is reported as an
-    error step in the trace — never a silent pass.
+Safety rules:
+  - This loop never picks or authorizes targets — you give it an adapter.
+  - Hard budget caps prevent infinite loops (max 20 rounds, max 50 cases/round).
+  - Every generated case goes through the same validation as hand-written tests.
+  - The full trace is recorded (no hidden decisions).
 """
 
 from __future__ import annotations

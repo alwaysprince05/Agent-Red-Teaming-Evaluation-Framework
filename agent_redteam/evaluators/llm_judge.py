@@ -1,13 +1,26 @@
-"""Configurable LLM-as-judge evaluator (optional, off by default).
+"""LLM Judge Evaluator — Uses a language model to judge agent responses (optional).
 
-Uses any OpenAI-compatible chat-completions endpoint configured via env vars:
-  AGENT_REDTEAM_LLM_BASE_URL, AGENT_REDTEAM_LLM_MODEL, AGENT_REDTEAM_LLM_API_KEY
+This is an optional evaluator that asks a language model to decide whether
+the agent's response violates the policy. It's more nuanced than the
+deterministic evaluator but requires an external API.
 
-Design constraints:
-  - temperature=0 for (more) reproducible verdicts;
-  - strict JSON output with a fixed schema;
-  - gracefully disabled when no configuration is present, so the framework
-    remains fully functional offline.
+How it works:
+  1. Builds a prompt showing the attack objective, policy rules, conversation,
+     and agent's response.
+  2. Sends it to an OpenAI-compatible API (configured via environment variables).
+  3. Parses the LLM's verdict: violated (true/false), severity, rationale, score.
+
+Configuration (environment variables):
+  - AGENT_REDTEAM_LLM_BASE_URL: The API endpoint URL.
+  - AGENT_REDTEAM_LLM_MODEL: Which model to use.
+  - AGENT_REDTEAM_LLM_API_KEY: API key for authentication.
+
+Safety rules:
+  - Uses temperature=0 for more reproducible results.
+  - If the LLM is not configured, returns an "error" status (not a pass).
+  - If the LLM call fails or returns garbage, returns an "error" (not a pass).
+  - The framework works perfectly fine without this — the deterministic evaluator
+    handles everything by default.
 """
 
 from __future__ import annotations

@@ -1,7 +1,20 @@
-"""Agent adapter interface and target resolution.
+"""Adapter Base — Defines how the framework talks to AI agents.
 
-Safe by default: `resolve_target` only accepts built-in mock agents unless the
-caller explicitly passes an allowlist of authorized external hosts.
+This file contains:
+  1. AgentAdapter (base class): Every adapter must follow this pattern.
+     It has one main method — send() — which sends conversation turns to the agent
+     and gets back the agent's response.
+
+  2. resolve_target(): Takes a target string (like "mock:weak" or "http://...") and
+     returns the correct adapter to use. This is the single place that decides
+     which adapter to create.
+
+  3. Safety checks: External HTTP targets are blocked by default. You must
+     explicitly allow them AND list the host in an allowlist. Localhost targets
+     (127.0.0.1) are always allowed. This prevents accidentally testing
+     someone else's agent.
+
+  4. TargetNotAuthorizedError: Raised when a target is not allowed.
 """
 
 from __future__ import annotations

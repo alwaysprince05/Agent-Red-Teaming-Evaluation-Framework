@@ -1,3 +1,15 @@
+"""Tests for Reports — Checks Markdown and CSV report generation.
+
+Tests in this file verify:
+  - Markdown reports are generated with correct run metadata.
+  - The report includes summary metrics (cases, violations, pass rate).
+  - Category breakdown tables show per-category stats.
+  - Findings are listed with severity, reproduction steps, and remediation.
+  - CSV export contains all findings with correct column headers.
+  - Reports work correctly for runs with violations (weak agent).
+  - Reports work correctly for clean runs (strong agent, no findings).
+"""
+
 from pathlib import Path
 
 import pytest

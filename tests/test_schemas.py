@@ -1,3 +1,16 @@
+"""Tests for Schemas — Checks all data models validate correctly.
+
+Tests in this file verify:
+  - TestCase validation enforces required fields (id, category, objective, turns, policy).
+  - Invalid IDs (wrong format, too long) are rejected.
+  - The last turn in a test case must be from the "user" role.
+  - Policy must have at least one rule (empty policies are rejected).
+  - Invalid regex patterns in policies are caught early.
+  - Severity and AttackCategory enums accept only valid values.
+  - ExecutionRecord correctly tracks timestamps, responses, and tool calls.
+  - ID generators (new_run_id, new_finding_id) produce unique, valid strings.
+"""
+
 import pytest
 from pydantic import ValidationError
 

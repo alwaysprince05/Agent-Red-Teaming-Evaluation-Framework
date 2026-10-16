@@ -1,4 +1,17 @@
-"""Run orchestration: suite -> executions -> evaluations -> findings -> metrics -> artifacts."""
+"""Runner — Orchestrates a full evaluation run from start to finish.
+
+This is the main pipeline file. It ties everything together:
+
+  1. Load the test suite (list of attack cases from a YAML/JSON file).
+  2. Execute each case against the target agent (via the engine).
+  3. Evaluate each response (did the agent leak secrets? obey injections?).
+  4. Build findings for every violation (with severity, evidence, and remediation).
+  5. Calculate metrics (attack success rate, pass rate, per-category stats).
+  6. Save everything to disk (summary.json, results.json, records.json).
+
+The output is a RunSummary with all metrics and findings, plus saved artifacts
+under runs/<run_id>/ that can be used for dashboards, reports, and comparisons.
+"""
 
 from __future__ import annotations
 

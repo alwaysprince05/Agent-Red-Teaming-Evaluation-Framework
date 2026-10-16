@@ -1,4 +1,19 @@
-"""Suite loading and validation from YAML/JSON files."""
+"""Suite Loader — Reads and validates attack test suites from YAML or JSON files.
+
+This file loads test suites — the files that contain all the attack test cases.
+A suite file lists the attacks to run, their categories, and the policies to check.
+
+What it does:
+  1. Reads a YAML or JSON file from disk.
+  2. Parses each test case and validates it (correct format, required fields, valid IDs).
+  3. Checks for duplicate IDs.
+  4. Returns a list of validated TestCase objects ready for the engine to execute.
+
+If anything is wrong (missing file, bad format, invalid test case), it raises
+a SuiteError with a clear message explaining exactly what went wrong.
+
+Supported formats: .yaml, .yml, .json
+"""
 
 from __future__ import annotations
 

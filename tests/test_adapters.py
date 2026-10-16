@@ -1,3 +1,15 @@
+"""Tests for Adapters — Checks target resolution and safety controls.
+
+Tests in this file verify:
+  - Mock targets ("mock:weak", "mock:strong") resolve correctly to MockAgent.
+  - Unknown target specs are rejected with clear errors.
+  - External HTTP targets are blocked by default (safety check).
+  - External targets are allowed only when explicitly authorized with an allowlist.
+  - Loopback addresses (localhost, 127.0.0.1) are always allowed.
+  - The weak mock agent leaks secrets and obeys injections.
+  - The strong mock agent refuses injections and protects secrets.
+"""
+
 import pytest
 
 from agent_redteam.adapters.base import (

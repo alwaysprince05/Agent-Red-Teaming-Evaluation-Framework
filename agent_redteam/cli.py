@@ -1,4 +1,23 @@
-"""Command-line interface for the Agent Red-Teaming & Evaluation Framework."""
+"""CLI — Command-line interface for the red-teaming framework.
+
+This file is the main entry point when you use the 'agent-redteam' command
+in your terminal. It handles all the commands you can run:
+
+Commands:
+  agent-redteam run          — Run attack tests against an AI agent.
+  agent-redteam compare      — Compare two runs to find regressions or improvements.
+  agent-redteam report       — Generate a Markdown report and CSV of findings.
+  agent-redteam dashboard    — Build an HTML dashboard with charts and graphs.
+  agent-redteam benchmark    — Measure speed and performance of the framework.
+  agent-redteam generate     — Create new attack test cases (using mutations or LLM).
+  agent-redteam adaptive     — Run a smart loop that plans, generates, attacks, and reflects.
+  agent-redteam list-attacks — Show available built-in test suites and safe targets.
+
+Exit codes:
+  0 = success (no violations found or command completed)
+  1 = violations found (useful for CI pipelines to block unsafe agents)
+  2 = error (invalid input, missing files, etc.)
+"""
 
 from __future__ import annotations
 

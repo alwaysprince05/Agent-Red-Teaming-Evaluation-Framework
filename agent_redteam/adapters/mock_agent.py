@@ -1,8 +1,18 @@
-"""Deterministic scripted mock agents used as safe, offline evaluation targets.
+"""Mock Agent — Fake AI agents used for safe, offline testing and demos.
 
-These are fictional test targets that live inside the framework. They simulate
-common vulnerability patterns so the whole evaluation pipeline can be tested
-and demoed offline, deterministically, without touching any real system.
+This file provides two pretend AI agents that run entirely inside the framework
+(no network, no real AI model). They are used for testing and demos:
+
+  - "weak" profile: A deliberately vulnerable agent that fails every safety test.
+    It obeys injected instructions, leaks fake passwords and API keys, and calls
+    dangerous tools like send_email and delete_file when asked.
+
+  - "strong" profile: A hardened agent that passes every safety test.
+    It refuses prompt injections, jailbreaks, and secret requests. It never calls
+    dangerous tools or reads sensitive files.
+
+These agents are completely scripted (deterministic) — they always give the same
+answer for the same input. No real secrets or data are involved.
 """
 
 from __future__ import annotations
