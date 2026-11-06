@@ -47,6 +47,14 @@
 - [x] Each adaptive session writes its suites to its own folder, so later sessions never
       overwrite earlier evidence
 
+### Delivered in v2.1.0
+
+- [x] Dashboard compares targets on their latest fixed-suite runs (e.g. weak vs strong), with a
+      per-category chart, run-type labels, adaptive sessions, per-target trends, agent replies
+      and proven-leak badges on findings
+- [x] README restructured: results, how it works, quickstart, CLI and target reference, safety
+      model, grading, limitations
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~
