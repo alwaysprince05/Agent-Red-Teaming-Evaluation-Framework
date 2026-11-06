@@ -23,7 +23,7 @@
 - [x] Final PRD deliverables report (docs/FINAL_REPORT.md)
 - [x] GitHub release v1.0.0
 
-### v2.0.0: agents that think for themselves
+### Delivered in v2.0.0: agents that think for themselves
 
 - [x] Real LLM target agent (`llm:weak` / `llm:strong`): model-driven replies and tool calls,
       simulated (never executed) tools, guardrails as the only difference between profiles

@@ -31,6 +31,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from agent_redteam import __version__
 from agent_redteam.adapters.base import MOCK_TARGETS, TargetNotAuthorizedError, resolve_target
 from agent_redteam.core.runner import RunOptions, execute_run
 from agent_redteam.core.suite import SuiteError
@@ -38,7 +39,7 @@ from agent_redteam.reports.generate import generate_findings_csv, generate_markd
 
 app = FastAPI(
     title="Agent Red-Teaming & Evaluation Framework",
-    version="0.1.0",
+    version=__version__,
     description="Reproducible adversarial testing for AI agents. "
     "Only test agents you own or are authorized to test.",
 )
