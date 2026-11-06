@@ -3,9 +3,9 @@
 **Project:** Agent Red-Teaming & Evaluation Framework
 **Student:** Prince Kumar Maurya (Roll No 240410700103, 2026, Gen AI track, Group G132)
 **Mentor:** Anurag Sarkar
-**Version:** 2.0.0 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
+**Version:** 2.0.1 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
 
-Verification state at v2.0.0: **196 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
+Verification state at v2.0.1: **201 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
 green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 
 ---
@@ -113,7 +113,7 @@ weakness of a 3B attacker, are listed in the README.
 
 Safety of the new parts: tools are simulated (never executed); model endpoints use the
 same authorization as HTTP targets; planner output is strictly validated with budgets it
-cannot raise; tests are offline and hermetic (196 passing, plus 1 opt-in live test).
+cannot raise; tests are offline and hermetic (201 passing, plus 1 opt-in live test).
 
 ## Safety summary
 

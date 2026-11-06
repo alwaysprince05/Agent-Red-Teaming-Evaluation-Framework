@@ -34,6 +34,12 @@
       replies, can stop early; strict validation with heuristic fallback; strategy feeds the generator
 - [x] Hermetic offline tests (env cleared), fake-model tests, opt-in live test, experiment script
 
+### Delivered in v2.0.1
+
+- [x] Adaptive loop survives unreliable LLM output: auto mode falls back to mutations for the round
+- [x] Generator asks for user-only turns (fewer rejected proposals); one-line rejection messages
+- [x] Adaptive report shows the full target label (e.g. `llm:strong@qwen2.5:3b`)
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~

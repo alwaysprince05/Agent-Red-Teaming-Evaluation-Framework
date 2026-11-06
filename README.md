@@ -1,7 +1,7 @@
 # Agent Red-Teaming & Evaluation Framework
 
 ![CI](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/badge/release-v2.0.0-blue)
+![Release](https://img.shields.io/badge/release-v2.0.1-blue)
 
 Reproducible adversarial testing and safety evaluation for AI agents.
 Built as an OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya**.
@@ -272,7 +272,7 @@ agent_redteam/
   api/         FastAPI service
   cli.py       run / compare / report / dashboard / benchmark / list-attacks
 attacks_example/  commented example for adding your own suites
-tests/         196 offline pytest tests (+1 opt-in live test): unit, integration, API, safety,
+tests/         201 offline pytest tests (+1 opt-in live test): unit, integration, API, safety,
                benchmark, generator, adaptive, LLM agent, planner
 docs/          architecture (+ diagram), performance, responsible use, final report, roadmap
 scripts/       real-LLM experiment runner, git history helper
@@ -291,7 +291,7 @@ scripts/       real-LLM experiment runner, git history helper
 ```bash
 pip install -r requirements.txt    # or: pip install -e ".[dev]"
 ruff check .        # lint
-pytest              # 196 tests, fully offline (no model or API key needed)
+pytest              # 201 tests, fully offline (no model or API key needed)
 docker build -t agent-redteam .
 docker run -p 8000:8000 agent-redteam
 ```
