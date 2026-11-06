@@ -32,6 +32,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agent_redteam import __version__
 from agent_redteam.core.schemas import RunSummary
 
 _REPLY_CHARS = 180
@@ -42,54 +43,100 @@ LEGACY_SESSION = "(older, not recorded)"
 NO_REPLY = "<span class='muted'>(no reply recorded)</span>"
 
 _CSS = """
-:root { color-scheme: dark; --bg:#0d1117; --panel:#161b22; --line:#30363d; --text:#e6edf3;
-        --muted:#8b949e; --bad:#f85149; --ok:#3fb950; }
+:root { color-scheme: dark; --bg:#0b0f14; --panel:#131a22; --panel2:#18212b; --line:#263140;
+        --grid:#1f2833; --text:#e6edf3; --text2:#c9d1d9; --muted:#8b98a5; --accent:#7c9cff;
+        --bad:#f85149; --ok:#3fb950; --warn:#d4a72c; --shadow:0 1px 2px rgba(0,0,0,.35); }
+@media (prefers-color-scheme: light) {
+  :root { color-scheme: light; --bg:#f6f8fa; --panel:#ffffff; --panel2:#f3f5f8; --line:#d8dee4;
+          --grid:#e7ebef; --text:#1f2328; --text2:#31373e; --muted:#5d6670; --accent:#3d5afe;
+          --bad:#cf222e; --ok:#1a7f37; --warn:#9a6700; --shadow:0 1px 2px rgba(31,35,40,.08); }
+}
 * { box-sizing: border-box; }
-body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-       background: var(--bg); color: var(--text); margin: 0; padding: 2rem; line-height: 1.45; }
-main { max-width: 1200px; margin: 0 auto; }
-h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
-h2 { font-size: 1.1rem; margin: 2.2rem 0 .4rem; }
-p.lead { color: var(--muted); margin: .2rem 0 1rem; max-width: 70ch; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+       background: var(--bg); color: var(--text); margin: 0; line-height: 1.5; }
+main { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem 2rem; }
+header.top { background: linear-gradient(135deg, rgba(124,156,255,.16), rgba(124,156,255,0) 60%);
+             border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+header.top .in { max-width: 1180px; margin: 0 auto; padding: 1.8rem 1.5rem 1.4rem; }
+.eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .12em;
+           text-transform: uppercase; }
+h1 { font-size: 1.9rem; margin: .2rem 0 .3rem; letter-spacing: -.01em; }
+.tagline { color: var(--muted); margin: 0 0 .9rem; max-width: 70ch; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: .15rem .7rem;
+        font-size: .78rem; color: var(--text2); }
+section { margin-top: 2.2rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .25rem; letter-spacing: -.005em; }
+p.lead { color: var(--muted); margin: 0 0 .9rem; max-width: 75ch; font-size: .92rem; }
 .muted { color: var(--muted); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-         gap: .8rem; margin: 1rem 0; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1.1rem; }
-.card .num { font-size: 1.7rem; font-weight: 700; }
-.card .lbl { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
-.card .sub { color: var(--muted); font-size: .8rem; margin-top: .2rem; }
-.card.hero { border-left: 4px solid var(--hero, var(--line)); }
-.heroes { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.heroes .num { font-size: 2.4rem; }
-.card .target { margin-top: .15rem; word-break: break-all; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-         padding: 1rem; overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-th, td { border-bottom: 1px solid var(--line); padding: .5rem .6rem; text-align: left; vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase;
-     letter-spacing: .04em; }
-.badge { display: inline-block; border-radius: 999px; padding: .1rem .6rem; font-size: .75rem;
-         font-weight: 600; white-space: nowrap; }
-.b-critical { background: #490202; color: #f85149; }
-.b-high { background: #3a1d02; color: #f0883e; }
-.b-medium { background: #33400a; color: #d4a72c; }
-.b-low { background: #0f2f1f; color: #3fb950; }
-.b-fixed { background: #0c2d6b; color: #79c0ff; }
-.b-adaptive { background: #2a1b4a; color: #d2a8ff; }
-.b-leak { background: #490202; color: #ffa198; }
-.bar { background: #21262d; border-radius: 4px; height: 8px; overflow: hidden;
-       margin-top: .25rem; min-width: 80px; }
-.bar > div { height: 100%; background: var(--bad); }
-.bar > div.ok { background: var(--ok); }
-.reply { color: #c9d1d9; font-size: .85rem; }
-.legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .85rem; margin: .4rem 0; }
-.legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; margin-right: .35rem;
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem;
+         overflow-x: auto; box-shadow: var(--shadow); }
+.compare .row { display: grid; grid-template-columns: minmax(170px, 270px) 1fr 110px; gap: 1rem;
+                align-items: center; padding: .7rem 0; border-bottom: 1px solid var(--grid); }
+.compare .row:last-child, .compare .row:nth-last-child(2) { border-bottom: 0; }
+.compare .who code { font-size: .9rem; color: var(--text); word-break: break-all; }
+.compare .who .sub { color: var(--muted); font-size: .78rem; }
+.compare .track { background: var(--panel2); border-radius: 999px; height: 14px; overflow: hidden; }
+.compare .track > div { height: 100%; border-radius: 999px; }
+.compare .big { font-size: 1.9rem; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+.compare .verdict { margin-top: .6rem; padding-top: .7rem; border-top: 1px solid var(--grid);
+                    color: var(--text2);
+                    font-size: .92rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem;
+         margin-top: .9rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: .85rem 1rem;
+        box-shadow: var(--shadow); }
+.card .num { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card .lbl { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }
+.card.alert .num { color: var(--bad); }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { border-bottom: 1px solid var(--grid); padding: .6rem .65rem; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase;
+     letter-spacing: .06em; border-bottom-color: var(--line); }
+tbody tr:hover { background: var(--panel2); }
+.badge { display: inline-block; border-radius: 999px; padding: .12rem .6rem; font-size: .72rem;
+         font-weight: 650; white-space: nowrap; border: 1px solid transparent; }
+.b-critical { background: rgba(248,81,73,.15); color: var(--bad); border-color: rgba(248,81,73,.35); }
+.b-high { background: rgba(240,136,62,.15); color: #e07b39; border-color: rgba(240,136,62,.35); }
+.b-medium { background: rgba(212,167,44,.15); color: var(--warn); border-color: rgba(212,167,44,.35); }
+.b-low { background: rgba(63,185,80,.15); color: var(--ok); border-color: rgba(63,185,80,.35); }
+.b-fixed { background: rgba(88,166,255,.14); color: #4c9aff; border-color: rgba(88,166,255,.35); }
+.b-adaptive { background: rgba(163,113,247,.15); color: #a371f7; border-color: rgba(163,113,247,.35); }
+.b-leak { background: var(--bad); color: #fff; }
+.bar { background: var(--panel2); border-radius: 999px; height: 6px; overflow: hidden;
+       margin-top: .35rem; min-width: 90px; }
+.bar > div { height: 100%; background: var(--bad); border-radius: 999px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.step { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: .15rem .55rem;
+        font-size: .8rem; white-space: nowrap; }
+.step b { color: var(--bad); font-weight: 650; }
+.step.clean b { color: var(--ok); }
+.arrow { color: var(--muted); }
+tr.sev-critical td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+tr.sev-high td:first-child { box-shadow: inset 3px 0 0 #e07b39; }
+tr.sev-medium td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+tr.sev-low td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+tr.leak { background: rgba(248,81,73,.07); }
+.reply { color: var(--text2); font-size: .85rem; border-left: 2px solid var(--line); padding-left: .6rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: .85rem; margin: 0 0 .5rem;
+          color: var(--text2); }
+.legend i { display: inline-block; width: .75rem; height: .75rem; border-radius: 3px; margin-right: .4rem;
             vertical-align: -1px; }
-.note { border-left: 3px solid #d4a72c; padding: .4rem .8rem; color: var(--muted); font-size: .85rem;
-        background: #1c1a10; border-radius: 0 6px 6px 0; }
-footer { margin-top: 3rem; color: var(--muted); font-size: .8rem; }
-@media (max-width: 640px) { body { padding: 1rem; } }
+svg .grid { stroke: var(--grid); }
+svg .axis { fill: var(--muted); font-size: 11px; }
+svg .cat { fill: var(--text2); font-size: 11.5px; }
+svg .val { fill: var(--text2); font-size: 10px; font-weight: 600; }
+.note { border-left: 3px solid var(--warn); padding: .55rem .9rem; color: var(--text2); font-size: .85rem;
+        background: rgba(212,167,44,.08); border-radius: 0 8px 8px 0; margin: 0 0 .9rem; }
+footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--muted);
+         font-size: .8rem; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem;
+         justify-content: space-between; }
+@media (max-width: 720px) {
+  main, header.top .in { padding-left: 1rem; padding-right: 1rem; }
+  .compare .row { grid-template-columns: 1fr 90px; }
+  .compare .track { grid-column: 1 / -1; grid-row: 2; }
+}
 """
 
 
@@ -212,38 +259,55 @@ def _legend(ranked: list[tuple[str, RunView, str]]) -> str:
 def _y_axis(out: list[str], left: int, right: int, top: float, plot_h: float) -> None:
     for frac in (0, 0.5, 1):
         y = top + plot_h * (1 - frac)
-        out.append(f"<line x1='{left}' x2='{right}' y1='{y:.1f}' y2='{y:.1f}' stroke='#30363d' />")
+        out.append(f"<line class='grid' x1='{left}' x2='{right}' y1='{y:.1f}' y2='{y:.1f}' />")
         out.append(
-            f"<text x='{left - 6}' y='{y + 4:.1f}' fill='#8b949e' font-size='11' "
-            f"text-anchor='end'>{int(frac * 100)}%</text>"
+            f"<text class='axis' x='{left - 8}' y='{y + 4:.1f}' text-anchor='end'>{int(frac * 100)}%</text>"
         )
 
 
 def _headline(views: list[RunView]) -> str:
-    heroes = [
-        f"<div class='card hero' style='--hero:{color}'>"
-        f"<div class='lbl'>Attack success</div>"
-        f"<div class='num'>{_pct(v.summary.metrics.attack_success_rate)}</div>"
-        f"<div class='target'><code>{_esc(target)}</code></div>"
-        f"<div class='sub'>{v.summary.metrics.violations} of {v.summary.metrics.executed} attacks, "
-        f"latest fixed-suite run</div></div>"
-        for target, v, color in _ranked_targets(views)
-    ]
+    ranked = _ranked_targets(views)
+    rows = "".join(
+        "<div class='row'>"
+        f"<div class='who'><code>{_esc(target)}</code>"
+        f"<div class='sub'>{v.summary.metrics.violations} of {v.summary.metrics.executed} attacks "
+        f"succeeded</div></div>"
+        f"<div class='track'><div style='width:{v.summary.metrics.attack_success_rate * 100:.1f}%;"
+        f"background:{color}'></div></div>"
+        f"<div class='big'>{_pct(v.summary.metrics.attack_success_rate)}</div>"
+        "</div>"
+        for target, v, color in ranked
+    )
+    verdict = ""
+    if len(ranked) >= 2:
+        (worst, wv, _), (best, bv, _) = ranked[0], ranked[-1]
+        gap = (wv.summary.metrics.attack_success_rate - bv.summary.metrics.attack_success_rate) * 100
+        verdict = (
+            f"<div class='verdict'><code>{_esc(best)}</code> is <b>{gap:.1f} points</b> lower than "
+            f"<code>{_esc(worst)}</code> on the same attacks.</div>"
+        )
+    compare = (
+        f"<div class='panel compare'><div class='eyebrow'>Attack success rate · lower is safer</div>"
+        f"{rows}{verdict}</div>"
+        if ranked
+        else ""
+    )
     findings = [f for v in views for f in v.summary.findings]
     sessions = {v.session for v in views if v.kind == "adaptive"}
+    leaks = sum(1 for f in findings if _is_leak(f))
     totals = [
-        (len(views), "Runs"),
-        (sum(v.summary.metrics.executed for v in views), "Attacks executed"),
-        (sum(v.summary.metrics.violations for v in views), "Violations"),
-        (sum(1 for f in findings if _is_leak(f)), "Proven leaks (canary)"),
-        (len(sessions), "Adaptive sessions"),
+        (len(views), "Runs", False),
+        (sum(v.summary.metrics.executed for v in views), "Attacks executed", False),
+        (sum(v.summary.metrics.violations for v in views), "Violations", False),
+        (leaks, "Proven leaks (canary)", leaks > 0),
+        (len(sessions), "Adaptive sessions", False),
     ]
     small = "".join(
-        f"<div class='card'><div class='num'>{n}</div><div class='lbl'>{_esc(label)}</div></div>"
-        for n, label in totals
+        f"<div class='card{' alert' if alert else ''}'><div class='num'>{n}</div>"
+        f"<div class='lbl'>{_esc(label)}</div></div>"
+        for n, label, alert in totals
     )
-    hero_row = f"<div class='cards heroes'>{''.join(heroes)}</div>" if heroes else ""
-    return f"{hero_row}<div class='cards'>{small}</div>"
+    return f"{compare}<div class='cards'>{small}</div>"
 
 
 def _category_chart(views: list[RunView]) -> str:
@@ -251,10 +315,10 @@ def _category_chart(views: list[RunView]) -> str:
     if not ranked:
         return "<p class='muted'>No fixed-suite runs yet.</p>"
     cats = sorted({c for _, v, _ in ranked for c in v.summary.metrics.by_category})
-    w, h, left, bottom, top = 760, 260, 44, 56, 14
+    w, h, left, bottom, top = 760, 270, 46, 50, 22
     plot_w, plot_h = w - left - 10, h - bottom - top
     group = plot_w / max(len(cats), 1)
-    bar = min(28.0, (group - 12) / len(ranked))
+    bar = min(40.0, (group - 16) / len(ranked))  # slot per target; the bar itself is narrower
     out = [
         f"<svg viewBox='0 0 {w} {h}' width='100%' role='img' "
         "aria-label='Violation rate per category, by target'>"
@@ -265,14 +329,20 @@ def _category_chart(views: list[RunView]) -> str:
         for ti, (target, v, color) in enumerate(ranked):
             rate = float(v.summary.metrics.by_category.get(cat, {}).get("violation_rate", 0.0))
             bh = plot_h * rate
+            x = x0 + ti * bar
             out.append(
-                f"<rect x='{x0 + ti * bar:.1f}' y='{top + plot_h - bh:.1f}' "
-                f"width='{bar - 2:.1f}' height='{max(bh, 1):.1f}' fill='{color}' rx='2'>"
+                f"<rect x='{x:.1f}' y='{top + plot_h - bh:.1f}' "
+                f"width='{bar - 10:.1f}' height='{max(bh, 1):.1f}' fill='{color}' rx='3'>"
                 f"<title>{_esc(target)} · {_esc(cat)}: {_pct(rate)}</title></rect>"
             )
+            if rate > 0:
+                out.append(
+                    f"<text class='val' x='{x + (bar - 10) / 2:.1f}' y='{top + plot_h - bh - 5:.1f}' "
+                    f"text-anchor='middle'>{rate * 100:.0f}%</text>"
+                )
         out.append(
-            f"<text x='{left + ci * group + group / 2:.1f}' y='{h - bottom + 18}' fill='#c9d1d9' "
-            f"font-size='11' text-anchor='middle'>{_esc(cat.replace('_', ' '))}</text>"
+            f"<text class='cat' x='{left + ci * group + group / 2:.1f}' y='{h - bottom + 20}' "
+            f"text-anchor='middle'>{_esc(cat.replace('_', ' '))}</text>"
         )
     out.append("</svg>")
     return f"<div class='panel'>{_legend(ranked)}{''.join(out)}</div>"
@@ -298,18 +368,20 @@ def _trend_svg(views: list[RunView], w: int = 760, h: int = 160) -> str:
         mine = [pos[id(v)] for v in runs if v.summary.target == target]
         if len(mine) > 1:
             points = " ".join(f"{x:.1f},{y:.1f}" for x, y in mine)
-            out.append(f"<polyline fill='none' stroke='{color}' stroke-width='2' points='{points}' />")
+            out.append(
+                f"<polyline fill='none' stroke='{color}' stroke-width='2.5' stroke-linejoin='round' "
+                f"points='{points}' />"
+            )
     for v in runs:
         x, y = pos[id(v)]
         tip = f"{v.summary.run_id} · {v.summary.target}: {_pct(v.summary.metrics.attack_success_rate)}"
         color = colors.get(v.summary.target, "#8b949e")
         out.append(
-            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='4' fill='{color}'><title>{_esc(tip)}</title></circle>"
+            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='5' fill='{color}' stroke='var(--panel)' stroke-width='2'>"
+            f"<title>{_esc(tip)}</title></circle>"
         )
-    out.append(f"<text x='{left}' y='{h - 4}' fill='#8b949e' font-size='11'>oldest</text>")
-    out.append(
-        f"<text x='{w - 16}' y='{h - 4}' fill='#8b949e' font-size='11' text-anchor='end'>newest</text>"
-    )
+    out.append(f"<text class='axis' x='{left}' y='{h - 4}'>oldest</text>")
+    out.append(f"<text class='axis' x='{w - 16}' y='{h - 4}' text-anchor='end'>newest</text>")
     out.append("</svg>")
     return f"<div class='panel'>{_legend(ranked)}{''.join(out)}</div>"
 
@@ -353,10 +425,15 @@ def _sessions(views: list[RunView]) -> str:
         return "<p class='muted'>No grouped adaptive sessions yet (older runs are listed under Runs).</p>"
     for sid, rounds in sorted(sessions.items(), reverse=True):
         rounds.sort(key=lambda r: r.round_no)
-        cats = " → ".join(
-            f"{_esc(next(iter(r.summary.metrics.by_category), '?'))} "
-            f"({r.summary.metrics.violations}/{r.summary.metrics.executed})"
-            for r in rounds
+        cats = (
+            "<div class='path'>"
+            + "<span class='arrow'>→</span>".join(
+                f"<span class='step{' clean' if not r.summary.metrics.violations else ''}'>"
+                f"{_esc(next(iter(r.summary.metrics.by_category), '?').replace('_', ' '))} "
+                f"<b>{r.summary.metrics.violations}/{r.summary.metrics.executed}</b></span>"
+                for r in rounds
+            )
+            + "</div>"
         )
         total_v = sum(r.summary.metrics.violations for r in rounds)
         total_e = sum(r.summary.metrics.executed for r in rounds)
@@ -381,8 +458,9 @@ def _findings(views: list[RunView]) -> str:
                 reply = reply[:_REPLY_CHARS] + "…"
             evidence = "; ".join(e.detail for e in f.evidence[:2])
             leak = " <span class='badge b-leak'>proven leak</span>" if _is_leak(f) else ""
+            row_cls = f"sev-{_esc(f.severity.value)}" + (" leak" if _is_leak(f) else "")
             rows.append(
-                "<tr>"
+                f"<tr class='{row_cls}'>"
                 f"<td><code>{_esc(f.test_id)}</code>"
                 f"<div class='muted'><code>{_esc(v.summary.run_id)}</code></div></td>"
                 f"<td><span class='badge b-{_esc(f.severity.value)}'>{_esc(f.severity.value)}</span>{leak}"
@@ -403,15 +481,26 @@ def _findings(views: list[RunView]) -> str:
 def generate_dashboard(runs_dir: str | Path, out_path: str | Path) -> Path:
     views = _load_views(runs_dir)
 
+    generated = time.strftime("%Y-%m-%d %H:%M")
     parts: list[str] = [
         "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         "<title>Agent Red-Team Evaluation Dashboard</title>"
-        f"<style>{_CSS}</style></head><body><main>",
-        "<h1>Agent Red-Team Evaluation Dashboard</h1>",
-        f"<p class='muted'>Generated {time.strftime('%Y-%m-%d %H:%M:%S')} &middot; "
-        f"{len(views)} run(s) read from <code>{_esc(runs_dir)}/</code> (read-only)</p>",
+        f"<style>{_CSS}</style></head><body>",
+        "<header class='top'><div class='in'><div class='eyebrow'>Agent red-teaming report</div>"
+        "<h1>Agent Red-Team Evaluation Dashboard</h1>"
+        "<p class='tagline'>How often adversarial attacks succeeded against each AI agent, what the "
+        "AI attacker tried, and the evidence for every failure.</p>"
+        f"<div class='chips'><span class='chip'>agent-redteam v{_esc(__version__)}</span>"
+        f"<span class='chip'>{len(views)} run(s) from <code>{_esc(runs_dir)}/</code></span>"
+        f"<span class='chip'>Generated {generated}</span><span class='chip'>Read-only · offline</span>"
+        "</div></div></header><main>",
     ]
+
+    def section(title: str, lead: str, body: str) -> str:
+        intro = f"<p class='lead'>{lead}</p>" if lead else ""
+        return f"<section><h2>{title}</h2>{intro}{body}</section>"
+
     if not views:
         parts.append(
             "<p class='muted'>No runs yet. Generate one with: "
@@ -422,27 +511,37 @@ def generate_dashboard(runs_dir: str | Path, out_path: str | Path) -> Path:
             "<p class='lead'>Headline numbers use each target's latest <b>fixed-suite</b> run, so targets "
             "are compared on the same attacks. Adaptive rounds are shown separately.</p>",
             _headline(views),
-            "<h2>Violation rate by category</h2>",
-            "<p class='lead'>Latest fixed-suite run per target. Lower is safer.</p>",
-            _category_chart(views),
-            "<h2>Runs</h2>",
-            _runs_table(views),
-            "<h2>Adaptive sessions</h2>",
-            "<p class='lead'>Each session is a closed loop: the planner picks a category, attacks are "
-            "generated and run, and the results feed the next round.</p>",
-            _sessions(views),
-            "<h2>Fixed-suite attack success over time</h2>",
-            _trend_svg(views),
-            "<h2>Findings (newest first)</h2>",
-            "<p class='note'>Keyword grading can flag a polite decline that does not match a known refusal "
-            "phrase. Read the agent reply before counting a finding; a <b>proven leak</b> badge means a "
-            "planted canary secret appeared, which is never a false alarm.</p>",
-            _findings(views),
+            section(
+                "Violation rate by category",
+                "Latest fixed-suite run per target. Lower is safer.",
+                _category_chart(views),
+            ),
+            section("Runs", "", _runs_table(views)),
+            section(
+                "Adaptive sessions",
+                "Each session is a closed loop: the planner picks a category, attacks are generated and "
+                "run, and the results feed the next round.",
+                _sessions(views),
+            ),
+            section(
+                "Fixed-suite attack success over time",
+                "One line per target; adaptive rounds are excluded because they use fewer, "
+                "different attacks.",
+                _trend_svg(views),
+            ),
+            section(
+                "Findings (newest first)",
+                "",
+                "<p class='note'>Keyword grading can flag a polite decline that does not match a known "
+                "refusal phrase. Read the agent reply before counting a finding; a <b>proven leak</b> badge "
+                "means a planted canary secret appeared, which is never a false alarm.</p>"
+                + _findings(views),
+            ),
         ]
     parts.append(
-        "<footer>Generated by the Agent Red-Teaming &amp; Evaluation Framework. "
-        "Static, local, read-only view over run artifacts &mdash; no data leaves this machine.</footer>"
-        "</main></body></html>"
+        f"<footer><span>Generated by agent-redteam v{_esc(__version__)} on {generated}.</span>"
+        "<span>Static, local, read-only view over run artifacts &mdash; no data leaves this machine.</span>"
+        "</footer></main></body></html>"
     )
 
     out = Path(out_path)
