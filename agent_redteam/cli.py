@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 from agent_redteam import __version__
-from agent_redteam.adapters.base import MOCK_TARGETS, TargetNotAuthorizedError, resolve_target
+from agent_redteam.adapters.base import LLM_TARGETS, MOCK_TARGETS, TargetNotAuthorizedError, resolve_target
 from agent_redteam.core.compare import compare_run_dirs, load_results_for_run
 from agent_redteam.core.runner import RunOptions, execute_run
 from agent_redteam.core.schemas import ATTACK_CATEGORIES
@@ -38,6 +38,12 @@ from agent_redteam.reports.generate import generate_findings_csv, generate_markd
 BUILTIN_SUITES = {
     "core": str(Path(__file__).parent / "attacks" / "core_suite.yaml"),
 }
+
+
+DEFAULT_CASE_TIMEOUT_S = 15.0
+LLM_CASE_TIMEOUT_S = 120.0
+_TARGET_HELP = "mock:weak | mock:strong | llm:weak | llm:strong | authorized http(s) URL"
+_TIMEOUT_HELP = "Per-case timeout in seconds (default 15; 120 for llm:* targets)"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -51,7 +57,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="Run an adversarial suite against a target agent")
     run.add_argument("--suite", default="core", help="Built-in suite name or path to a suite YAML/JSON")
-    run.add_argument("--target", default="mock:weak", help="mock:weak | mock:strong | authorized http(s) URL")
+    run.add_argument("--target", default="mock:weak", help=_TARGET_HELP)
     run.add_argument(
         "--allow-external", action="store_true",
         help="Explicitly authorize testing an external (non-loopback) HTTP target",
@@ -60,7 +66,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--allowed-hosts", default="",
         help="Comma-separated host allowlist required for non-loopback external targets",
     )
-    run.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout in seconds")
+    run.add_argument("--timeout", type=float, default=None, help=_TIMEOUT_HELP)
     run.add_argument("--rate-limit", type=float, default=0.2, help="Seconds between sends")
     run.add_argument(
         "--use-llm-judge", action="store_true",
@@ -86,10 +92,10 @@ def _build_parser() -> argparse.ArgumentParser:
     bench = sub.add_parser("benchmark", help="Measure throughput, latency and failure rates")
     bench.add_argument("--suite", default="core", help="Built-in suite name or path to suite YAML/JSON")
     bench.add_argument(
-        "--target", default="mock:weak", help="mock:weak | mock:strong | authorized http(s) URL"
+        "--target", default="mock:weak", help=_TARGET_HELP
     )
     bench.add_argument("--iterations", type=int, default=3, help="How many times to run the full suite")
-    bench.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout in seconds")
+    bench.add_argument("--timeout", type=float, default=None, help=_TIMEOUT_HELP)
     bench.add_argument("--json", action="store_true", dest="as_json", help="Print machine-readable JSON")
 
     gen = sub.add_parser(
@@ -126,7 +132,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "adaptive",
         help="Closed-loop red-teaming: the agent plans, generates, attacks and reflects",
     )
-    ada.add_argument("--target", default="mock:weak", help="mock:weak | mock:strong | authorized http(s) URL")
+    ada.add_argument("--target", default="mock:weak", help=_TARGET_HELP)
     ada.add_argument(
         "--allow-external", action="store_true",
         help="Explicitly authorize testing an external (non-loopback) HTTP target",
@@ -142,8 +148,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--mode", choices=("auto", "llm", "mutate"), default="auto",
         help="Generation mode (auto = LLM if configured, else deterministic mutations)",
     )
+    ada.add_argument(
+        "--planner", choices=("auto", "llm", "heuristic"), default="auto",
+        help="Who decides the next attack: auto = LLM planner if configured, else heuristic rule",
+    )
     ada.add_argument("--seed", type=int, default=0, help="Seed for reproducible generation")
-    ada.add_argument("--timeout", type=float, default=15.0, help="Per-case timeout seconds")
+    ada.add_argument("--timeout", type=float, default=None, help=_TIMEOUT_HELP)
     ada.add_argument("--rate-limit", type=float, default=0.0, help="Seconds between sends")
     ada.add_argument("--out", default="runs", help="Directory for run artifacts")
     ada.add_argument(
@@ -153,6 +163,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("list-attacks", help="List built-in adversarial suites")
     return p
+
+
+def _case_timeout(args: argparse.Namespace) -> float:
+    """Explicit --timeout wins; real model targets get more time than scripted ones."""
+    if args.timeout is not None:
+        return args.timeout
+    return LLM_CASE_TIMEOUT_S if args.target in LLM_TARGETS else DEFAULT_CASE_TIMEOUT_S
 
 
 def _suite_path(name_or_path: str) -> str:
@@ -198,7 +215,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             RunOptions(
                 use_llm_judge=args.use_llm_judge,
                 rate_limit_s=args.rate_limit,
-                timeout_s=args.timeout,
+                timeout_s=_case_timeout(args),
                 output_dir=Path(args.out),
             ),
         )
@@ -290,7 +307,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             _suite_path(args.suite),
             adapter,
             iterations=args.iterations,
-            timeout_s=args.timeout,
+            timeout_s=_case_timeout(args),
         )
     except (TargetNotAuthorizedError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -365,11 +382,12 @@ def cmd_adaptive(args: argparse.Namespace) -> int:
         limits=AdaptiveLimit(max_rounds=args.max_rounds, cases_per_round=args.cases_per_round),
         run_options=RunOptions(
             rate_limit_s=args.rate_limit,
-            timeout_s=args.timeout,
+            timeout_s=_case_timeout(args),
             output_dir=Path(args.out),
         ),
         generation_mode=args.mode,
         rng_seed=args.seed,
+        planner_mode=args.planner,
     )
 
     # Same CI-gate contract as `run`: exit 1 when violations were found.
@@ -381,9 +399,14 @@ def cmd_adaptive(args: argparse.Namespace) -> int:
         print(json.dumps(dataclasses.asdict(report), indent=2, default=str))
         return exit_code
 
-    print(f"Adaptive red-team loop against {report.target} — {len(report.rounds)} round(s) executed")
+    print(
+        f"Adaptive red-team loop against {report.target} — {len(report.rounds)} round(s) executed "
+        f"(planner: {report.planner})"
+    )
     for r in report.rounds:
-        print(f"\n[Round {r.round_no}] PLAN   {r.plan}")
+        print(f"\n[Round {r.round_no}] PLAN   ({r.planner}) {r.plan}")
+        if r.strategy:
+            print(f"           STRATEGY {r.strategy}")
         print(f"           GENERATE {r.generated} case(s) via {r.mode_used} for {r.planned_category}"
               + (f" ({r.rejected} rejected)" if r.rejected else ""))
         if r.rejected_reasons:
@@ -405,6 +428,7 @@ def cmd_list_attacks(_args: argparse.Namespace) -> int:
     for name, path in BUILTIN_SUITES.items():
         print(f"  {name}: {path}")
     print("Safe demo targets:", ", ".join(MOCK_TARGETS))
+    print("Real LLM targets (local Ollama by default):", ", ".join(LLM_TARGETS))
     return 0
 
 

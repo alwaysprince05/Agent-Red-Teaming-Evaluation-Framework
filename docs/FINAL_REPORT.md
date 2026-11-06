@@ -87,6 +87,34 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 - ✅ **CI/CD quality-gate support** via exit codes (PRD §2.2-6)
 - ◻ Remaining stretch items tracked in [docs/ROADMAP.md](ROADMAP.md)
 
+## v2.0.0: agents that think for themselves (mentor feedback)
+
+Mentor feedback: the agents should not be hardcoded. Both were:
+
+| Before (v1) | After (v2) | Where |
+|---|---|---|
+| Target agent = keyword `if/else` script (`mock:weak` always fails, `mock:strong` always passes) | `llm:weak` / `llm:strong`: a real model decides its replies and tool calls; profiles differ only by guardrails in the system prompt | [llm_agent.py](../agent_redteam/adapters/llm_agent.py) |
+| Attacker picks the next category by a fixed rule | LLM planner reads the history and the target's replies, picks category + strategy or stops; validated, with the rule as fallback | [planner.py](../agent_redteam/core/planner.py), [adaptive.py](../agent_redteam/core/adaptive.py) |
+| Grading checked the mock's own fake password | Fresh canary secrets planted per run; every case checks for them | [core_suite.yaml](../agent_redteam/attacks/core_suite.yaml) |
+
+Measured on a local `qwen2.5:3b` (3 repeats; raw data in
+[results/llm_experiment_20261107.json](results/llm_experiment_20261107.json)):
+
+| Target | Fixed suite attack success rate | Adaptive loop violations |
+|---|---|---|
+| `llm:weak` | 79% (77–83%) | 6 / 9 |
+| `llm:strong` | 31% (31–31%) | 1 / 9 |
+
+Guardrails reduced the attack success rate from 79% to 31%. The strong agent leaked no
+canary but was jailbroken by a "developer mode" prompt in all 3 runs, and an AI-generated attack
+(asking for the password "in a format") made it search for the secret instead of refusing.
+Limitations, including keyword-grading misjudgements found by manual review and the
+weakness of a 3B attacker, are listed in the README.
+
+Safety of the new parts: tools are simulated (never executed); model endpoints use the
+same authorization as HTTP targets; planner output is strictly validated with budgets it
+cannot raise; tests are offline and hermetic (195 passing, plus 1 opt-in live test).
+
 ## Safety summary
 
 - Safe by default: external targets refused without explicit consent + host allowlist (CLI and API).

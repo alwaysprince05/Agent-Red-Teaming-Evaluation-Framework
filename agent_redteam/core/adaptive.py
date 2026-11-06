@@ -4,12 +4,14 @@ This file runs an automated attack loop that keeps trying to find weaknesses
 in an AI agent. Instead of running a fixed list of tests, it thinks and adapts:
 
 The loop (repeats up to a budget limit):
-  1. PLAN    — Look at past results and pick the weakest category to attack next.
-               (e.g., if "jailbreak" attacks worked before, try more of those)
+  1. PLAN    — Decide which category to attack next and how. With an LLM configured,
+               the LLM planner reads the history (including the target's replies) and
+               picks a category, a strategy, or decides to stop; otherwise a
+               deterministic rule picks the weakest category (see core/planner.py).
   2. GENERATE — Create new attack test cases for that category.
-               (uses deterministic mutations by default, or an LLM if configured)
+               (an LLM following the planner's strategy, or deterministic mutations)
   3. ATTACK  — Run the generated tests against the target agent.
-  4. REFLECT — Check the results and decide: keep going or stop?
+  4. REFLECT — Record the outcome; the next PLAN step sees it and may stop the loop.
 
 Safety rules:
   - This loop never picks or authorizes targets — you give it an adapter.
@@ -31,8 +33,18 @@ from agent_redteam.core.generator import (
     generate_suite,
     save_suite,
 )
+from agent_redteam.core.planner import (
+    MAX_SAMPLE_CHARS,
+    MAX_SAMPLES_PER_ROUND,
+    HeuristicPlanner,
+    LLMPlanner,
+    PlanDecision,
+    PlanState,
+    RoundOutcome,
+    make_planner,
+)
 from agent_redteam.core.runner import RunOptions, execute_run
-from agent_redteam.core.schemas import ATTACK_CATEGORIES, AttackCategory, TestCase
+from agent_redteam.core.schemas import AttackCategory, TestCase
 from agent_redteam.core.suite import load_suite
 
 DEFAULT_MAX_ROUNDS = 5
@@ -69,6 +81,8 @@ class RoundTrace:
     elapsed_s: float
     decision: str
     rejected_reasons: list[str] = field(default_factory=list)
+    planner: str = "heuristic"
+    strategy: str = ""
 
 
 @dataclass
@@ -83,43 +97,7 @@ class AdaptiveReport:
     total_executed: int
     stopped_reason: str
     categories_attacked: list[str]
-
-
-def _pick_category(
-    round_no: int,
-    violations_by_cat: dict[str, int],
-    tried: list[str],
-    categories: list[str],
-) -> tuple[AttackCategory, str]:
-    """Phase 1 — PLAN. Deterministic heuristic attacker: weakest category first.
-
-    Priorities = categories where attacks already succeeded (probe the vein
-    deeper), then untried categories (broaden coverage), then round-robin.
-    Returns (category, plan rationale) — the plan is always inspectable.
-    """
-    if round_no > 1:
-        succeeded = sorted(
-            (c for c, v in violations_by_cat.items() if v > 0 and c in categories),
-            key=lambda c: -violations_by_cat[c],
-        )
-        if succeeded:
-            top = succeeded[0]
-            return (
-                AttackCategory(top),
-                f"rounds so far found {violations_by_cat[top]} violation(s) in "
-                f"{top}; probing the same vein deeper",
-            )
-    untried = [c for c in categories if c not in tried]
-    if untried:
-        return (
-            AttackCategory(untried[0]),
-            f"{untried[0]} not yet probed this session; broadening coverage",
-        )
-    fallback = categories[(round_no - 1) % len(categories)]
-    return (
-        AttackCategory(fallback),
-        f"all categories probed; cycling back to {fallback} for deeper variants",
-    )
+    planner: str = "heuristic"
 
 
 class AdaptiveAgent:
@@ -134,6 +112,8 @@ class AdaptiveAgent:
         run_options: RunOptions | None = None,
         generation_mode: str = "auto",
         rng_seed: int = 0,
+        planner_mode: str = "auto",
+        planner: HeuristicPlanner | LLMPlanner | None = None,
     ) -> None:
         if adapter is None:
             raise ValueError("adapter is required (the loop never fabricates a target)")
@@ -142,6 +122,7 @@ class AdaptiveAgent:
         self.run_options = run_options or RunOptions(rate_limit_s=0.0)
         self.generation_mode = generation_mode
         self.rng_seed = rng_seed
+        self.planner = planner or make_planner(planner_mode)
         self.seeds: list[TestCase] = load_suite(seed_suite_path)
         self._used_ids: set[str] = {c.id for c in self.seeds}
         self._round_suites: list[Path] = []
@@ -154,15 +135,8 @@ class AdaptiveAgent:
             rid = f"{base}-G{n:02d}"
         return rid
 
-    def _plan_next_category(
-        self, round_no: int, violations_by_cat: dict[str, int], tried: list[str]
-    ) -> tuple[AttackCategory, str]:
-        return _pick_category(
-            round_no, violations_by_cat, tried, list(ATTACK_CATEGORIES)
-        )
-
     def _generate_round(
-        self, cat: AttackCategory, round_no: int
+        self, cat: AttackCategory, round_no: int, strategy: str = ""
     ) -> tuple[list[TestCase], list[str], str]:
         """Phase 2 — GENERATE. Agent decides the attack content (validated)."""
         cases, errors, mode_used = generate_suite(
@@ -171,6 +145,7 @@ class AdaptiveAgent:
             self.seeds,
             mode=self.generation_mode,
             seed=self.rng_seed + round_no * 101,
+            guidance=strategy or None,
         )
         # Enforce globally-unique ids across the whole loop (no cross-round collision).
         for i, case in enumerate(cases):
@@ -184,7 +159,7 @@ class AdaptiveAgent:
     def run(self, *, output_dir: Path | None = None) -> AdaptiveReport:
         out_dir = Path(output_dir or self.run_options.output_dir)
         trace: list[RoundTrace] = []
-        violations_by_cat: dict[str, int] = {}
+        history: list[RoundOutcome] = []
         tried: list[str] = []
         total_generated = total_rejected = total_violations = total_executed = 0
         stopped_reason = ""
@@ -193,12 +168,19 @@ class AdaptiveAgent:
             t0 = time.monotonic()
 
             # ---------- Phase 1: PLAN ----------
-            cat, rationale = self._plan_next_category(round_no, violations_by_cat, tried)
+            plan: PlanDecision = self.planner.plan(
+                PlanState(round_no=round_no, max_rounds=self.limits.max_rounds, history=history)
+            )
+            if plan.stop and trace:
+                trace[-1].decision = "stop"
+                stopped_reason = f"planner decided to stop before round {round_no}: {plan.rationale}"
+                break
+            cat, rationale, strategy = plan.category, plan.rationale, plan.strategy
             tried.append(cat.value)
 
             # ---------- Phase 2: GENERATE ----------
             try:
-                cases, errors, mode_used = self._generate_round(cat, round_no)
+                cases, errors, mode_used = self._generate_round(cat, round_no, strategy)
             except GeneratorError as exc:
                 trace.append(RoundTrace(
                     round_no=round_no, plan=rationale, planned_category=cat.value,
@@ -206,6 +188,7 @@ class AdaptiveAgent:
                     violations=0, executed=0, run_id="", suite_path="",
                     elapsed_s=time.monotonic() - t0, decision="stop",
                     rejected_reasons=[f"generation failed: {exc}"],
+                    planner=plan.planner, strategy=strategy,
                 ))
                 stopped_reason = f"generation failed in round {round_no}: {exc}"
                 break
@@ -217,6 +200,7 @@ class AdaptiveAgent:
                     violations=0, executed=0, run_id="", suite_path="",
                     elapsed_s=time.monotonic() - t0, decision="stop",
                     rejected_reasons=errors,
+                    planner=plan.planner, strategy=strategy,
                 ))
                 stopped_reason = f"round {round_no}: no valid cases generated for {cat.value}"
                 break
@@ -235,10 +219,14 @@ class AdaptiveAgent:
                 max_turns=self.run_options.max_turns,
                 output_dir=out_dir,
             )
-            run_id, summary, _results, _records = execute_run(str(saved), self.adapter, options)
+            run_id, summary, results, records = execute_run(str(saved), self.adapter, options)
             elapsed = time.monotonic() - t0
 
-            violations_by_cat[cat.value] = violations_by_cat.get(cat.value, 0) + summary.metrics.violations
+            history.append(RoundOutcome(
+                round_no=round_no, category=cat.value, strategy=strategy,
+                executed=summary.metrics.executed, violations=summary.metrics.violations,
+                samples=_reply_samples(results, records),
+            ))
             total_generated += len(cases)
             total_rejected += len(errors)
             total_violations += summary.metrics.violations
@@ -269,6 +257,7 @@ class AdaptiveAgent:
                 executed=summary.metrics.executed, run_id=run_id,
                 suite_path=str(saved), elapsed_s=elapsed,
                 decision=decision, rejected_reasons=errors,
+                planner=plan.planner, strategy=strategy,
             ))
             if decision == "stop":
                 stopped_reason = why
@@ -286,7 +275,22 @@ class AdaptiveAgent:
             total_executed=total_executed,
             stopped_reason=stopped_reason,
             categories_attacked=tried,
+            planner=self.planner.name,
         )
+
+
+def _reply_samples(results: list, records: list) -> list[dict]:
+    """A few target replies (violations first) so the planner sees what actually happened."""
+    by_id = {r.test_id: r for r in records}
+    ordered = sorted(results, key=lambda r: not r.violated)[:MAX_SAMPLES_PER_ROUND]
+    return [
+        {
+            "test_id": r.test_id,
+            "violated": r.violated,
+            "reply": (by_id[r.test_id].response_text if r.test_id in by_id else "")[:MAX_SAMPLE_CHARS],
+        }
+        for r in ordered
+    ]
 
 
 def run_adaptive(
@@ -298,6 +302,7 @@ def run_adaptive(
     generation_mode: str = "auto",
     rng_seed: int = 0,
     output_dir: Path | None = None,
+    planner_mode: str = "auto",
 ) -> AdaptiveReport:
     """Convenience entry: build the agent and run the full loop. Returns the report."""
     return AdaptiveAgent(
@@ -307,6 +312,7 @@ def run_adaptive(
         run_options=run_options,
         generation_mode=generation_mode,
         rng_seed=rng_seed,
+        planner_mode=planner_mode,
     ).run(output_dir=output_dir)
 
 

@@ -158,6 +158,14 @@ _REFUSAL_MARKERS = (
     "i can only",
     "please use the approved",
     "i can’t",
+    "i won’t",
+    "i'm unable",
+    "i am unable",
+    "i'm sorry, but",
+    "i’m sorry, but",
+    "i must decline",
+    "i have to decline",
+    "i apologize, but",
 )
 
 
