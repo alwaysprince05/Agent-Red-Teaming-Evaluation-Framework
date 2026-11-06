@@ -43,72 +43,83 @@ LEGACY_SESSION = "(older, not recorded)"
 NO_REPLY = "<span class='muted'>(no reply recorded)</span>"
 
 _CSS = """
-:root { color-scheme: dark; --bg:#0b0f14; --panel:#131a22; --panel2:#18212b; --line:#263140;
-        --grid:#1f2833; --text:#e6edf3; --text2:#c9d1d9; --muted:#8b98a5; --accent:#7c9cff;
-        --bad:#f85149; --ok:#3fb950; --warn:#d4a72c; --shadow:0 1px 2px rgba(0,0,0,.35); }
+:root { color-scheme: dark; --bg:#0b0e13; --panel:#12171e; --raise:#171d26; --line:#232b36; --grid:#1c232d;
+        --text:#e8edf2; --text2:#b9c2cc; --muted:#7f8a96; --accent:#8aa4ff; --bad:#ff6b5e; --ok:#3fb950;
+        --warn:#d4a72c; }
 @media (prefers-color-scheme: light) {
-  :root { color-scheme: light; --bg:#f6f8fa; --panel:#ffffff; --panel2:#f3f5f8; --line:#d8dee4;
-          --grid:#e7ebef; --text:#1f2328; --text2:#31373e; --muted:#5d6670; --accent:#3d5afe;
-          --bad:#cf222e; --ok:#1a7f37; --warn:#9a6700; --shadow:0 1px 2px rgba(31,35,40,.08); }
+  :root { color-scheme: light; --bg:#f5f7f9; --panel:#ffffff; --raise:#f0f3f6; --line:#dde3e9;
+          --grid:#e9edf1; --text:#1b2027; --text2:#3d4652; --muted:#66717d; --accent:#3d5afe;
+          --bad:#d1242f; --ok:#1a7f37; --warn:#9a6700; }
 }
 * { box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-       background: var(--bg); color: var(--text); margin: 0; line-height: 1.5; }
-main { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem 2rem; }
-header.top { background: linear-gradient(135deg, rgba(124,156,255,.16), rgba(124,156,255,0) 60%);
-             border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
-header.top .in { max-width: 1180px; margin: 0 auto; padding: 1.8rem 1.5rem 1.4rem; }
-.eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .12em;
-           text-transform: uppercase; }
-h1 { font-size: 1.9rem; margin: .2rem 0 .3rem; letter-spacing: -.01em; }
-.tagline { color: var(--muted); margin: 0 0 .9rem; max-width: 70ch; }
-.chips { display: flex; flex-wrap: wrap; gap: .5rem; }
-.chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: .15rem .7rem;
-        font-size: .78rem; color: var(--text2); }
-section { margin-top: 2.2rem; }
-h2 { font-size: 1.15rem; margin: 0 0 .25rem; letter-spacing: -.005em; }
-p.lead { color: var(--muted); margin: 0 0 .9rem; max-width: 75ch; font-size: .92rem; }
+body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
+       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 1.5rem; }
+header.top { border-bottom: 1px solid var(--line); background: var(--panel); }
+header.top .wrap { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+                   gap: 1rem 2rem; padding-top: 1.4rem; padding-bottom: 1.3rem; }
+h1 { font-size: 1.45rem; margin: 0; letter-spacing: -.01em; }
+header.top .intro { flex: 1 1 420px; min-width: 0; }
+header.top .chips { flex: 0 1 auto; justify-content: flex-end; }
+.tagline { color: var(--muted); margin: .2rem 0 0; font-size: .92rem; max-width: 62ch; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: .1rem .65rem; font-size: .76rem;
+        color: var(--text2); background: var(--bg); white-space: nowrap; }
+main.wrap { padding-top: 1.8rem; padding-bottom: 2rem; }
+section { margin-top: 2.6rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .2rem; }
+p.lead { color: var(--muted); margin: 0 0 .9rem; font-size: .9rem; max-width: 75ch; }
 .muted { color: var(--muted); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem;
-         overflow-x: auto; box-shadow: var(--shadow); }
-.compare .row { display: grid; grid-template-columns: minmax(170px, 270px) 1fr 110px; gap: 1rem;
-                align-items: center; padding: .7rem 0; border-bottom: 1px solid var(--grid); }
-.compare .row:last-child, .compare .row:nth-last-child(2) { border-bottom: 0; }
-.compare .who code { font-size: .9rem; color: var(--text); word-break: break-all; }
-.compare .who .sub { color: var(--muted); font-size: .78rem; }
-.compare .track { background: var(--panel2); border-radius: 999px; height: 14px; overflow: hidden; }
-.compare .track > div { height: 100%; border-radius: 999px; }
-.compare .big { font-size: 1.9rem; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
-.compare .verdict { margin-top: .6rem; padding-top: .7rem; border-top: 1px solid var(--grid);
-                    color: var(--text2);
-                    font-size: .92rem; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem;
-         margin-top: .9rem; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: .85rem 1rem;
-        box-shadow: var(--shadow); }
-.card .num { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.card .lbl { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }
-.card.alert .num { color: var(--bad); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem 1.4rem;
+         overflow-x: auto; }
+.hero { display: grid; grid-template-columns: 1fr 230px; gap: 1.5rem 2.5rem; align-items: center; }
+.kicker { color: var(--muted); font-size: .74rem; font-weight: 650; letter-spacing: .08em;
+          text-transform: uppercase; margin-bottom: .5rem; }
+.trow { display: grid; grid-template-columns: 170px 1fr 120px; gap: 1rem; align-items: center;
+        padding: .55rem 0; }
+.trow .name { font-weight: 650; }
+.trow .model { color: var(--muted); font-size: .76rem; }
+.trow .model code { font-size: .95em; }
+.track { background: var(--raise); border-radius: 999px; height: 12px; overflow: hidden; }
+.track > div { height: 100%; border-radius: 999px; }
+.trow .pct { font-size: 1.5rem; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+.trow .of { color: var(--muted); font-size: .76rem; text-align: right; }
+.delta { border-left: 1px solid var(--line); padding-left: 2rem; }
+.delta .big { font-size: 2.9rem; font-weight: 800; line-height: 1; color: var(--ok);
+              font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.delta .big small { font-size: 1.1rem; font-weight: 700; }
+.delta .cap { color: var(--text2); font-size: .85rem; margin-top: .5rem; }
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 1rem;
+         border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.strip > div { padding: .85rem 1.2rem; border-right: 1px solid var(--line); }
+.strip > div:last-child { border-right: 0; }
+.strip .num { font-size: 1.45rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.strip .lbl { color: var(--muted); font-size: .78rem; }
+.strip .alert .num { color: var(--bad); }
+.footnote { color: var(--muted); font-size: .8rem; margin: .6rem .2rem 0; }
 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
 th, td { border-bottom: 1px solid var(--grid); padding: .6rem .65rem; text-align: left; vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase;
-     letter-spacing: .06em; border-bottom-color: var(--line); }
-tbody tr:hover { background: var(--panel2); }
-.badge { display: inline-block; border-radius: 999px; padding: .12rem .6rem; font-size: .72rem;
-         font-weight: 650; white-space: nowrap; border: 1px solid transparent; }
-.b-critical { background: rgba(248,81,73,.15); color: var(--bad); border-color: rgba(248,81,73,.35); }
-.b-high { background: rgba(240,136,62,.15); color: #e07b39; border-color: rgba(240,136,62,.35); }
-.b-medium { background: rgba(212,167,44,.15); color: var(--warn); border-color: rgba(212,167,44,.35); }
-.b-low { background: rgba(63,185,80,.15); color: var(--ok); border-color: rgba(63,185,80,.35); }
-.b-fixed { background: rgba(88,166,255,.14); color: #4c9aff; border-color: rgba(88,166,255,.35); }
-.b-adaptive { background: rgba(163,113,247,.15); color: #a371f7; border-color: rgba(163,113,247,.35); }
+     letter-spacing: .06em;
+     border-bottom-color: var(--line); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--raise); }
+.badge { display: inline-block; border-radius: 999px; padding: .1rem .55rem; font-size: .72rem;
+         font-weight: 650;
+         white-space: nowrap; border: 1px solid transparent; }
+.b-critical { background: rgba(255,107,94,.13); color: var(--bad); border-color: rgba(255,107,94,.3); }
+.b-high { background: rgba(240,136,62,.13); color: #e07b39; border-color: rgba(240,136,62,.3); }
+.b-medium { background: rgba(212,167,44,.13); color: var(--warn); border-color: rgba(212,167,44,.3); }
+.b-low { background: rgba(63,185,80,.13); color: var(--ok); border-color: rgba(63,185,80,.3); }
+.b-fixed { background: rgba(88,166,255,.12); color: #4c9aff; border-color: rgba(88,166,255,.3); }
+.b-adaptive { background: rgba(163,113,247,.13); color: #a371f7; border-color: rgba(163,113,247,.3); }
 .b-leak { background: var(--bad); color: #fff; }
-.bar { background: var(--panel2); border-radius: 999px; height: 6px; overflow: hidden;
-       margin-top: .35rem; min-width: 90px; }
+.bar { background: var(--raise); border-radius: 999px; height: 6px; overflow: hidden; margin-top: .35rem;
+       min-width: 90px; }
 .bar > div { height: 100%; background: var(--bad); border-radius: 999px; }
 .path { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
-.step { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: .15rem .55rem;
+.step { background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: .15rem .55rem;
         font-size: .8rem; white-space: nowrap; }
 .step b { color: var(--bad); font-weight: 650; }
 .step.clean b { color: var(--ok); }
@@ -117,25 +128,27 @@ tr.sev-critical td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
 tr.sev-high td:first-child { box-shadow: inset 3px 0 0 #e07b39; }
 tr.sev-medium td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 tr.sev-low td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
-tr.leak { background: rgba(248,81,73,.07); }
+tr.leak { background: rgba(255,107,94,.06); }
 .reply { color: var(--text2); font-size: .85rem; border-left: 2px solid var(--line); padding-left: .6rem; }
-.legend { display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: .85rem; margin: 0 0 .5rem;
+.legend { display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: .85rem; margin: 0 0 .6rem;
           color: var(--text2); }
 .legend i { display: inline-block; width: .75rem; height: .75rem; border-radius: 3px; margin-right: .4rem;
             vertical-align: -1px; }
 svg .grid { stroke: var(--grid); }
 svg .axis { fill: var(--muted); font-size: 11px; }
-svg .cat { fill: var(--text2); font-size: 11.5px; }
-svg .val { fill: var(--text2); font-size: 10px; font-weight: 600; }
+svg .cat { fill: var(--text); font-size: 12.5px; }
+svg .val { fill: var(--text2); font-size: 11px; font-weight: 600; }
 .note { border-left: 3px solid var(--warn); padding: .55rem .9rem; color: var(--text2); font-size: .85rem;
-        background: rgba(212,167,44,.08); border-radius: 0 8px 8px 0; margin: 0 0 .9rem; }
-footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--muted);
+        background: rgba(212,167,44,.07); border-radius: 0 8px 8px 0; margin: 0 0 .9rem; }
+footer { margin-top: 3rem; padding-top: 1.1rem; border-top: 1px solid var(--line); color: var(--muted);
          font-size: .8rem; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem;
          justify-content: space-between; }
-@media (max-width: 720px) {
-  main, header.top .in { padding-left: 1rem; padding-right: 1rem; }
-  .compare .row { grid-template-columns: 1fr 90px; }
-  .compare .track { grid-column: 1 / -1; grid-row: 2; }
+@media (max-width: 760px) {
+  .wrap { padding: 0 1rem; }
+  .hero { grid-template-columns: 1fr; }
+  .delta { border-left: 0; border-top: 1px solid var(--line); padding: 1rem 0 0; }
+  .trow { grid-template-columns: 1fr 120px; }
+  .trow .track { grid-column: 1 / -1; grid-row: 2; }
 }
 """
 
@@ -251,8 +264,20 @@ def _ranked_targets(views: list[RunView]) -> list[tuple[str, RunView, str]]:
     return [(t, latest[t], _PALETTE[i % len(_PALETTE)]) for i, t in enumerate(order)]
 
 
+def _display(target: str) -> tuple[str, str]:
+    """('Weak agent', 'llm · qwen2.5:3b') for 'llm:weak@qwen2.5:3b'; other targets are shown as-is."""
+    base, _, model = target.partition("@")
+    kind, _, profile = base.partition(":")
+    if kind in ("llm", "mock") and profile:
+        return f"{profile.capitalize()} agent", f"{kind} · {model}" if model else kind
+    return target, ""
+
+
 def _legend(ranked: list[tuple[str, RunView, str]]) -> str:
-    items = "".join(f"<span><i style='background:{c}'></i>{_esc(t)}</span>" for t, _, c in ranked)
+    items = "".join(
+        f"<span title='{_esc(t)}'><i style='background:{c}'></i>{_esc(_display(t)[0])}</span>"
+        for t, _, c in ranked
+    )
     return f"<div class='legend'>{items}</div>"
 
 
@@ -267,85 +292,122 @@ def _y_axis(out: list[str], left: int, right: int, top: float, plot_h: float) ->
 
 def _headline(views: list[RunView]) -> str:
     ranked = _ranked_targets(views)
-    rows = "".join(
-        "<div class='row'>"
-        f"<div class='who'><code>{_esc(target)}</code>"
-        f"<div class='sub'>{v.summary.metrics.violations} of {v.summary.metrics.executed} attacks "
-        f"succeeded</div></div>"
-        f"<div class='track'><div style='width:{v.summary.metrics.attack_success_rate * 100:.1f}%;"
-        f"background:{color}'></div></div>"
-        f"<div class='big'>{_pct(v.summary.metrics.attack_success_rate)}</div>"
-        "</div>"
-        for target, v, color in ranked
-    )
-    verdict = ""
+    rows = []
+    for target, v, color in ranked:
+        m = v.summary.metrics
+        name, _ = _display(target)
+        rows.append(
+            "<div class='trow'>"
+            f"<div><div class='name'>{_esc(name)}</div>"
+            f"<div class='model'><code>{_esc(target)}</code></div></div>"
+            f"<div class='track'><div style='width:{m.attack_success_rate * 100:.1f}%;background:{color}'>"
+            "</div></div>"
+            f"<div><div class='pct'>{_pct(m.attack_success_rate)}</div>"
+            f"<div class='of'>{m.violations} of {m.executed} attacks</div></div>"
+            "</div>"
+        )
+    delta = ""
     if len(ranked) >= 2:
         (worst, wv, _), (best, bv, _) = ranked[0], ranked[-1]
         gap = (wv.summary.metrics.attack_success_rate - bv.summary.metrics.attack_success_rate) * 100
-        verdict = (
-            f"<div class='verdict'><code>{_esc(best)}</code> is <b>{gap:.1f} points</b> lower than "
-            f"<code>{_esc(worst)}</code> on the same attacks.</div>"
+        same = wv.summary.metrics.executed == bv.summary.metrics.executed
+        attacks = f"the same {bv.summary.metrics.executed} attacks" if same else "the fixed suite"
+        delta = (
+            f"<div class='delta'><div class='big'>&minus;{gap:.1f}<small> pts</small></div>"
+            f"<div class='cap'><b>{_esc(_display(best)[0])}</b> vs <b>{_esc(_display(worst)[0])}</b>: "
+            f"lower attack success on {attacks}.</div></div>"
         )
-    compare = (
-        f"<div class='panel compare'><div class='eyebrow'>Attack success rate · lower is safer</div>"
-        f"{rows}{verdict}</div>"
-        if ranked
-        else ""
-    )
+    hero = ""
+    if ranked:
+        hero = (
+            "<div class='panel hero'><div>"
+            "<div class='kicker'>Attack success rate &middot; lower is safer</div>"
+            f"{''.join(rows)}</div>{delta}</div>"
+        )
     findings = [f for v in views for f in v.summary.findings]
-    sessions = {v.session for v in views if v.kind == "adaptive"}
     leaks = sum(1 for f in findings if _is_leak(f))
-    totals = [
-        (len(views), "Runs", False),
-        (sum(v.summary.metrics.executed for v in views), "Attacks executed", False),
-        (sum(v.summary.metrics.violations for v in views), "Violations", False),
-        (leaks, "Proven leaks (canary)", leaks > 0),
-        (len(sessions), "Adaptive sessions", False),
-    ]
-    small = "".join(
-        f"<div class='card{' alert' if alert else ''}'><div class='num'>{n}</div>"
-        f"<div class='lbl'>{_esc(label)}</div></div>"
-        for n, label, alert in totals
+    executed = sum(v.summary.metrics.executed for v in views)
+    violations = sum(v.summary.metrics.violations for v in views)
+    rounds = sum(1 for v in views if v.kind == "adaptive")
+    sessions = len({v.session for v in views if v.kind == "adaptive"})
+    strip = (
+        "<div class='strip'>"
+        f"<div class='{'alert' if leaks else ''}'><div class='num'>{leaks}</div>"
+        "<div class='lbl'>Proven leaks (canary secret in a reply)</div></div>"
+        f"<div><div class='num'>{violations} <span class='muted'>/ {executed}</span></div>"
+        "<div class='lbl'>Violations across all runs</div></div>"
+        f"<div><div class='num'>{rounds}</div><div class='lbl'>AI-planned rounds in {sessions} "
+        f"session{'s' if sessions != 1 else ''}</div></div>"
+        "</div>"
     )
-    return f"{compare}<div class='cards'>{small}</div>"
+    note = (
+        "<p class='footnote'>Each agent's numbers come from its latest fixed-suite run, so agents are "
+        "compared on identical attacks. Adaptive rounds use different, AI-written attacks and are shown "
+        "separately below.</p>"
+    )
+    return f"{hero}{strip}{note}"
 
 
 def _category_chart(views: list[RunView]) -> str:
     ranked = _ranked_targets(views)
     if not ranked:
         return "<p class='muted'>No fixed-suite runs yet.</p>"
-    cats = sorted({c for _, v, _ in ranked for c in v.summary.metrics.by_category})
-    w, h, left, bottom, top = 760, 270, 46, 50, 22
-    plot_w, plot_h = w - left - 10, h - bottom - top
-    group = plot_w / max(len(cats), 1)
-    bar = min(40.0, (group - 16) / len(ranked))  # slot per target; the bar itself is narrower
+
+    def rate(v: RunView, cat: str) -> float:
+        return float(v.summary.metrics.by_category.get(cat, {}).get("violation_rate", 0.0))
+
+    cats = sorted(
+        {c for _, v, _ in ranked for c in v.summary.metrics.by_category},
+        key=lambda c: (-max(rate(v, c) for _, v, _ in ranked), c),
+    )
+    n = len(ranked)
+    bar_h, gap, pad = 11, 4, 16
+    row_h = n * bar_h + (n - 1) * gap + pad * 2
+    w, left, right, top = 760, 200, 60, 24
+    plot_w = w - left - right
+    h = top + row_h * len(cats) + 4
     out = [
         f"<svg viewBox='0 0 {w} {h}' width='100%' role='img' "
         "aria-label='Violation rate per category, by target'>"
     ]
-    _y_axis(out, left, w - 10, top, plot_h)
-    for ci, cat in enumerate(cats):
-        x0 = left + ci * group + (group - bar * len(ranked)) / 2
-        for ti, (target, v, color) in enumerate(ranked):
-            rate = float(v.summary.metrics.by_category.get(cat, {}).get("violation_rate", 0.0))
-            bh = plot_h * rate
-            x = x0 + ti * bar
-            out.append(
-                f"<rect x='{x:.1f}' y='{top + plot_h - bh:.1f}' "
-                f"width='{bar - 10:.1f}' height='{max(bh, 1):.1f}' fill='{color}' rx='3'>"
-                f"<title>{_esc(target)} · {_esc(cat)}: {_pct(rate)}</title></rect>"
-            )
-            if rate > 0:
-                out.append(
-                    f"<text class='val' x='{x + (bar - 10) / 2:.1f}' y='{top + plot_h - bh - 5:.1f}' "
-                    f"text-anchor='middle'>{rate * 100:.0f}%</text>"
-                )
+    for frac in (0, 0.5, 1):
+        x = left + plot_w * frac
+        out.append(f"<line class='grid' x1='{x:.1f}' x2='{x:.1f}' y1='{top - 6}' y2='{h - 2}' />")
         out.append(
-            f"<text class='cat' x='{left + ci * group + group / 2:.1f}' y='{h - bottom + 20}' "
-            f"text-anchor='middle'>{_esc(cat.replace('_', ' '))}</text>"
+            f"<text class='axis' x='{x:.1f}' y='{top - 10}' text-anchor='middle'>{int(frac * 100)}%</text>"
         )
+    for ci, cat in enumerate(cats):
+        y0 = top + ci * row_h
+        if ci:
+            out.append(f"<line class='grid' x1='0' x2='{w}' y1='{y0:.1f}' y2='{y0:.1f}' />")
+        out.append(
+            f"<text class='cat' x='0' y='{y0 + row_h / 2 + 4:.1f}'>"
+            f"{_esc(cat.replace('_', ' ').capitalize())}</text>"
+        )
+        for ti, (target, v, color) in enumerate(ranked):
+            r = rate(v, cat)
+            y = y0 + pad + ti * (bar_h + gap)
+            bw = max(plot_w * r, 2)
+            faded = "" if r else " opacity='.45'"
+            out.append(
+                f"<rect x='{left}' y='{y:.1f}' width='{bw:.1f}' height='{bar_h}' rx='3' "
+                f"fill='{color}'{faded}>"
+                f"<title>{_esc(target)} · {_esc(cat)}: {_pct(r)}</title></rect>"
+            )
+            out.append(
+                f"<text class='val' x='{left + bw + 6:.1f}' y='{y + bar_h - 2:.1f}'>{r * 100:.0f}%</text>"
+            )
     out.append("</svg>")
     return f"<div class='panel'>{_legend(ranked)}{''.join(out)}</div>"
+
+
+def _has_trend(views: list[RunView]) -> bool:
+    """A trend needs at least one target with two or more fixed-suite runs."""
+    counts: dict[str, int] = {}
+    for v in views:
+        if v.kind == "fixed":
+            counts[v.summary.target] = counts.get(v.summary.target, 0) + 1
+    return any(n >= 2 for n in counts.values())
 
 
 def _trend_svg(views: list[RunView], w: int = 760, h: int = 160) -> str:
@@ -487,14 +549,14 @@ def generate_dashboard(runs_dir: str | Path, out_path: str | Path) -> Path:
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         "<title>Agent Red-Team Evaluation Dashboard</title>"
         f"<style>{_CSS}</style></head><body>",
-        "<header class='top'><div class='in'><div class='eyebrow'>Agent red-teaming report</div>"
+        "<header class='top'><div class='wrap'><div class='intro'>"
         "<h1>Agent Red-Team Evaluation Dashboard</h1>"
-        "<p class='tagline'>How often adversarial attacks succeeded against each AI agent, what the "
-        "AI attacker tried, and the evidence for every failure.</p>"
+        "<p class='tagline'>How often adversarial attacks succeeded against each AI agent, what the AI "
+        "attacker tried, and the evidence for every failure.</p></div>"
         f"<div class='chips'><span class='chip'>agent-redteam v{_esc(__version__)}</span>"
-        f"<span class='chip'>{len(views)} run(s) from <code>{_esc(runs_dir)}/</code></span>"
-        f"<span class='chip'>Generated {generated}</span><span class='chip'>Read-only · offline</span>"
-        "</div></div></header><main>",
+        f"<span class='chip'>{len(views)} run(s) &middot; <code>{_esc(runs_dir)}/</code></span>"
+        f"<span class='chip'>{generated}</span><span class='chip'>Offline &middot; read-only</span>"
+        "</div></div></header><main class='wrap'>",
     ]
 
     def section(title: str, lead: str, body: str) -> str:
@@ -508,12 +570,10 @@ def generate_dashboard(runs_dir: str | Path, out_path: str | Path) -> Path:
         )
     else:
         parts += [
-            "<p class='lead'>Headline numbers use each target's latest <b>fixed-suite</b> run, so targets "
-            "are compared on the same attacks. Adaptive rounds are shown separately.</p>",
             _headline(views),
             section(
-                "Violation rate by category",
-                "Latest fixed-suite run per target. Lower is safer.",
+                "Where each agent fails",
+                "Share of attacks that succeeded in each category, most vulnerable first.",
                 _category_chart(views),
             ),
             section("Runs", "", _runs_table(views)),
@@ -523,12 +583,17 @@ def generate_dashboard(runs_dir: str | Path, out_path: str | Path) -> Path:
                 "run, and the results feed the next round.",
                 _sessions(views),
             ),
-            section(
-                "Fixed-suite attack success over time",
-                "One line per target; adaptive rounds are excluded because they use fewer, "
-                "different attacks.",
-                _trend_svg(views),
-            ),
+        ]
+        if _has_trend(views):
+            parts.append(
+                section(
+                    "Fixed-suite attack success over time",
+                    "One line per target; adaptive rounds are excluded because they use fewer, "
+                    "different attacks.",
+                    _trend_svg(views),
+                )
+            )
+        parts += [
             section(
                 "Findings (newest first)",
                 "",

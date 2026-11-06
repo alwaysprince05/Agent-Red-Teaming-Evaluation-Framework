@@ -71,13 +71,23 @@ def test_adaptive_session_grouped_and_excluded_from_trend(mixed_runs):
     text = html_of(mixed_runs)
     sessions_html = text.split("<h2>Adaptive sessions</h2>")[1].split("<h2>")[0]
     assert next(iter(sessions)) in sessions_html
+    # One fixed run per target is not a trend, so the section is left out.
+    assert "Fixed-suite attack success over time" not in text
+
+
+def test_trend_uses_only_fixed_runs_when_repeated(mixed_runs, weak_agent, suite_path):
+    execute_run(
+        suite_path, weak_agent, RunOptions(rate_limit_s=0.0, output_dir=mixed_runs), run_id="fixed-weak-2"
+    )
+    text = html_of(mixed_runs)
     trend = text.split("<h2>Fixed-suite attack success over time</h2>")[1].split("<h2>")[0]
-    assert len(re.findall(r"<circle ", trend)) == 2  # only the two fixed-suite runs
+    assert len(re.findall(r"<circle ", trend)) == 3  # three fixed-suite runs, adaptive rounds excluded
+    assert trend.count("<polyline") == 1  # only the weak agent has a line (two runs)
 
 
 def test_category_chart_has_axes_and_legend(mixed_runs):
     text = html_of(mixed_runs)
-    chart = text.split("<h2>Violation rate by category</h2>")[1].split("<h2>")[0]
+    chart = text.split("<h2>Where each agent fails</h2>")[1].split("<h2>")[0]
     assert "100%" in chart and "0%" in chart and "class='legend'" in chart
     assert chart.count("<rect ") >= 12  # 6 categories x 2 targets
 
@@ -129,7 +139,9 @@ def test_footer_and_header_show_version(mixed_runs):
 
 def test_comparison_states_the_gap(mixed_runs):
     headline = html_of(mixed_runs).split("<h2>")[0]
-    assert "<b>100.0 points</b> lower than" in headline  # mock:strong 0% vs mock:weak 100%
+    assert "&minus;100.0<small> pts</small>" in headline  # mock:strong 0% vs mock:weak 100%
+    assert "<b>Strong agent</b> vs <b>Weak agent</b>" in headline
+    assert "the same 13 attacks" in headline
 
 
 def test_supports_light_and_dark_and_stays_offline(mixed_runs):
@@ -140,5 +152,18 @@ def test_supports_light_and_dark_and_stays_offline(mixed_runs):
 
 
 def test_bar_values_are_labelled(mixed_runs):
-    chart = html_of(mixed_runs).split("<h2>Violation rate by category</h2>")[1].split("<h2>")[0]
+    chart = html_of(mixed_runs).split("<h2>Where each agent fails</h2>")[1].split("<h2>")[0]
     assert "class='val'" in chart and ">100%</text>" in chart
+
+
+def test_categories_sorted_most_vulnerable_first(mixed_runs):
+    chart = html_of(mixed_runs).split("<h2>Where each agent fails</h2>")[1].split("<h2>")[0]
+    labels = re.findall(r"<text class='cat'[^>]*>([^<]+)</text>", chart)
+    assert len(labels) == 6
+    # mock:weak fails every category at 100%, so ties fall back to alphabetical order.
+    assert labels == sorted(labels)
+
+
+def test_readable_names_keep_the_exact_target_visible(mixed_runs):
+    headline = html_of(mixed_runs).split("<h2>")[0]
+    assert "Weak agent" in headline and "<code>mock:weak</code>" in headline
