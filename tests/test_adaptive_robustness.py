@@ -79,3 +79,15 @@ def test_validation_errors_are_one_line():
 def test_report_target_includes_profile(weak_agent, suite_path, tmp_path):
     report = make_agent(weak_agent, suite_path, tmp_path, "mutate", rounds=1).run(output_dir=tmp_path)
     assert report.target == "mock:weak"
+
+
+def test_sessions_never_overwrite_each_others_suites(weak_agent, suite_path, tmp_path):
+    from agent_redteam.core.suite import load_suite
+
+    first = make_agent(weak_agent, suite_path, tmp_path, "mutate", rounds=1).run(output_dir=tmp_path)
+    second = make_agent(weak_agent, suite_path, tmp_path, "mutate", rounds=1).run(output_dir=tmp_path)
+    assert first.session_id and first.session_id != second.session_id
+    p1, p2 = first.rounds[0].suite_path, second.rounds[0].suite_path
+    assert p1 != p2 and first.session_id in p1
+    # The first session's evidence is intact after the second session ran.
+    assert load_suite(p1) and all(c.id for c in load_suite(p1))

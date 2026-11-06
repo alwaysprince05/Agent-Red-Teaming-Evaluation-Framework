@@ -44,7 +44,7 @@ from agent_redteam.core.planner import (
     make_planner,
 )
 from agent_redteam.core.runner import RunOptions, execute_run
-from agent_redteam.core.schemas import AttackCategory, TestCase
+from agent_redteam.core.schemas import AttackCategory, TestCase, new_run_id
 from agent_redteam.core.suite import load_suite
 
 DEFAULT_MAX_ROUNDS = 5
@@ -98,6 +98,7 @@ class AdaptiveReport:
     stopped_reason: str
     categories_attacked: list[str]
     planner: str = "heuristic"
+    session_id: str = ""
 
 
 class AdaptiveAgent:
@@ -174,6 +175,8 @@ class AdaptiveAgent:
 
     def run(self, *, output_dir: Path | None = None) -> AdaptiveReport:
         out_dir = Path(output_dir or self.run_options.output_dir)
+        # One folder per session, so a later session never overwrites this one's evidence.
+        session_id = new_run_id()
         trace: list[RoundTrace] = []
         history: list[RoundOutcome] = []
         tried: list[str] = []
@@ -222,7 +225,7 @@ class AdaptiveAgent:
                 break
 
             # Persist the round's suite: reviewable and re-runnable evidence.
-            suite_path = out_dir / "adaptive_suites" / f"round{round_no:02d}_{cat.value}.yaml"
+            suite_path = out_dir / "adaptive_suites" / session_id / f"round{round_no:02d}_{cat.value}.yaml"
             saved = save_suite(cases, suite_path)
             self._round_suites.append(saved)
 
@@ -294,6 +297,7 @@ class AdaptiveAgent:
             stopped_reason=stopped_reason,
             categories_attacked=tried,
             planner=self.planner.name,
+            session_id=session_id,
         )
 
 
