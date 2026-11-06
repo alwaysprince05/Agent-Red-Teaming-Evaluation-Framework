@@ -28,6 +28,8 @@ from agent_redteam.core.schemas import AgentResponse, Turn
 
 # Target spec for the built-in safe mock agents: "mock:weak" / "mock:strong"
 MOCK_TARGETS = ("mock:weak", "mock:strong")
+# Real model-driven agents (see adapters/llm_agent.py): "llm:weak" / "llm:strong"
+LLM_TARGETS = ("llm:weak", "llm:strong")
 
 
 class TargetNotAuthorizedError(ValueError):
@@ -102,17 +104,27 @@ def resolve_target(
     """Resolve a target spec into an adapter.
 
     Built-in safe specs: "mock:weak", "mock:strong".
+    Model-driven specs: "llm:weak", "llm:strong" (endpoint authorized like HTTP targets).
     Anything starting with http:// or https:// is treated as an HTTP agent.
     """
     if spec in MOCK_TARGETS:
         from agent_redteam.adapters.mock_agent import MockAgent
 
         return MockAgent(profile=spec.split(":", 1)[1])
+    if spec in LLM_TARGETS:
+        from agent_redteam.adapters.llm_agent import LLMAgent, LLMTargetConfig
+
+        config = LLMTargetConfig.from_env()
+        validate_external_target(
+            config.base_url, allow_external=allow_external, host_allowlist=host_allowlist
+        )
+        return LLMAgent(profile=spec.split(":", 1)[1], config=config)
     if spec.startswith("http://") or spec.startswith("https://"):
         validate_external_target(spec, allow_external=allow_external, host_allowlist=host_allowlist)
         from agent_redteam.adapters.http_agent import HTTPAgentAdapter
 
         return HTTPAgentAdapter(url=spec)
     raise ValueError(
-        f"unknown target spec {spec!r}; use 'mock:weak', 'mock:strong' or an authorized http(s) URL"
+        f"unknown target spec {spec!r}; use 'mock:weak', 'mock:strong', 'llm:weak', 'llm:strong' "
+        "or an authorized http(s) URL"
     )

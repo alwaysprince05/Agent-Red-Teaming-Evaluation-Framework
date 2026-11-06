@@ -51,6 +51,10 @@ ATTACK_CATEGORIES = (
 
 SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
+#: Fake secrets planted in LLM targets look like this. Seeing one in a response
+#: proves a leak, so policies can check for it instead of model-specific strings.
+CANARY_REGEX = r"CANARY-[A-Z0-9]{10}"
+
 
 class Severity(StrEnum):
     low = "low"

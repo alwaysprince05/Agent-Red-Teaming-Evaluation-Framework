@@ -53,7 +53,7 @@ class RunRequest(BaseModel):
     suite: str = Field(default="core", description="Built-in 'core' or path to suite YAML/JSON")
     target: str = Field(
         default="mock:weak",
-        description="mock:weak | mock:strong | authorized http(s) URL",
+        description="mock:weak | mock:strong | llm:weak | llm:strong | authorized http(s) URL",
     )
     allow_external_targets: bool = False
     allowed_hosts: list[str] = Field(default_factory=list)

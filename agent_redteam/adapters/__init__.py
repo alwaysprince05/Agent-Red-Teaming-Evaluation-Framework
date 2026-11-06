@@ -15,6 +15,7 @@ Key exports:
 """
 
 from agent_redteam.adapters.base import (
+    LLM_TARGETS,
     MOCK_TARGETS,
     AgentAdapter,
     TargetNotAuthorizedError,
@@ -22,6 +23,7 @@ from agent_redteam.adapters.base import (
 )
 
 __all__ = [
+    "LLM_TARGETS",
     "MOCK_TARGETS",
     "AgentAdapter",
     "TargetNotAuthorizedError",
