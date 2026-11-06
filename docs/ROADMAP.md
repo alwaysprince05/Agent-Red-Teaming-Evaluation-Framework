@@ -23,6 +23,17 @@
 - [x] Final PRD deliverables report (docs/FINAL_REPORT.md)
 - [x] GitHub release v1.0.0
 
+### v2.0.0: agents that think for themselves
+
+- [x] Real LLM target agent (`llm:weak` / `llm:strong`): model-driven replies and tool calls,
+      simulated (never executed) tools, guardrails as the only difference between profiles
+- [x] Canary secrets planted per run; every suite case checks for them (proven leaks)
+- [x] Grading fixed for real models: wider refusal detection, indirect-injection cases accept
+      a benign answer that ignores the injection
+- [x] LLM planner for the adaptive loop: picks category + strategy from history and target
+      replies, can stop early; strict validation with heuristic fallback; strategy feeds the generator
+- [x] Hermetic offline tests (env cleared), fake-model tests, opt-in live test, experiment script
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~
