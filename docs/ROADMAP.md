@@ -61,6 +61,12 @@
       points, labelled bar values, planner path as chips, severity-coloured findings, light and dark
       mode, version in the footer
 
+### Delivered in v2.2.0
+
+- [x] Dashboard redesigned around the result: readable agent names, comparison bars with the gap as
+      a headline number, a three-number metrics strip led by proven leaks, a horizontal chart sorted
+      by vulnerability, compact header; the trend chart appears only when a target has repeated runs
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~

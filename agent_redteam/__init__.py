@@ -11,4 +11,4 @@ What this project does:
 Safe by default: targets must be local mock agents or explicitly authorized endpoints.
 """
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
