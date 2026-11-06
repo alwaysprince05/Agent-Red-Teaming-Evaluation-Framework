@@ -1,7 +1,7 @@
 # Agent Red-Teaming & Evaluation Framework
 
 ![CI](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/badge/release-v2.1.0-blue)
+![Release](https://img.shields.io/badge/release-v2.1.1-blue)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -27,7 +27,7 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
   authorization; the attacker has hard budgets it cannot raise.
 - **Fair comparisons.** `weak` and `strong` share one system prompt and differ only by
   guardrails, so results measure the guardrails alone.
-- **Engineering quality.** 217 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 221 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API, offline HTML dashboard, Markdown/CSV reports.
 
 ## Results on a real LLM agent
@@ -121,7 +121,7 @@ To reproduce the results table: `python scripts/llm_experiment.py --repeats 3 --
 | `generate --category C --count N` | Write new attack cases to a suite file for review |
 | `compare --baseline A --current B` | Regressions and improvements between two runs; exit 1 on regressions |
 | `report --run R` | Markdown + CSV report with evidence and remediation |
-| `dashboard [--runs-dir D]` | Offline HTML dashboard: target comparison, sessions, findings |
+| `dashboard [--runs-dir D]` | Offline HTML dashboard (light/dark): target comparison, sessions, findings |
 | `benchmark --target T` | Throughput, latency and failure rates |
 | `list-attacks` | Built-in suites and safe targets |
 
@@ -215,7 +215,7 @@ agent_redteam/
   reports/     Markdown/CSV reports, HTML dashboard
   api/         FastAPI service
   cli.py       command-line interface
-tests/         217 offline tests + 1 opt-in live test
+tests/         221 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, final report, roadmap, results
 ```
@@ -224,7 +224,7 @@ docs/          architecture, performance, responsible use, final report, roadmap
 
 ```bash
 ruff check .                              # lint
-pytest                                    # 217 tests, fully offline
+pytest                                    # 221 tests, fully offline
 RUN_LIVE_LLM=1 pytest tests/test_live_llm.py   # optional, needs a local model
 docker build -t agent-redteam . && docker run -p 8000:8000 agent-redteam
 ```

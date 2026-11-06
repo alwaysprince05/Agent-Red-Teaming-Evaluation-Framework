@@ -55,6 +55,12 @@
 - [x] README restructured: results, how it works, quickstart, CLI and target reference, safety
       model, grading, limitations
 
+### Delivered in v2.1.1
+
+- [x] Dashboard redesign: header with version, side-by-side comparison bars with the gap stated in
+      points, labelled bar values, planner path as chips, severity-coloured findings, light and dark
+      mode, version in the footer
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~
