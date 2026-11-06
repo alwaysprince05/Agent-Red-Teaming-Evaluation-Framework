@@ -138,15 +138,31 @@ class AdaptiveAgent:
     def _generate_round(
         self, cat: AttackCategory, round_no: int, strategy: str = ""
     ) -> tuple[list[TestCase], list[str], str]:
-        """Phase 2 — GENERATE. Agent decides the attack content (validated)."""
-        cases, errors, mode_used = generate_suite(
-            cat,
-            self.limits.cases_per_round,
-            self.seeds,
-            mode=self.generation_mode,
-            seed=self.rng_seed + round_no * 101,
-            guidance=strategy or None,
-        )
+        """Phase 2 — GENERATE. Agent decides the attack content (validated).
+
+        In auto mode an LLM failure (or zero valid proposals) falls back to deterministic
+        mutations for this round, so one bad model reply does not end the whole loop.
+        An explicit mode never falls back.
+        """
+        seed = self.rng_seed + round_no * 101
+        fallback_note = ""
+        try:
+            cases, errors, mode_used = generate_suite(
+                cat, self.limits.cases_per_round, self.seeds,
+                mode=self.generation_mode, seed=seed, guidance=strategy or None,
+            )
+            if not cases and mode_used == "llm" and self.generation_mode == "auto":
+                fallback_note = "LLM proposals were all invalid"
+        except GeneratorError as exc:
+            if self.generation_mode != "auto":
+                raise
+            cases, errors, fallback_note = [], [], str(exc)
+        if fallback_note:
+            mut_cases, mut_errors, mode_used = generate_suite(
+                cat, self.limits.cases_per_round, self.seeds, mode="mutate", seed=seed
+            )
+            errors = [*errors, f"  fell back to mutations: {fallback_note}", *mut_errors]
+            cases = mut_cases
         # Enforce globally-unique ids across the whole loop (no cross-round collision).
         for i, case in enumerate(cases):
             if case.id in self._used_ids:
@@ -267,7 +283,9 @@ class AdaptiveAgent:
             stopped_reason = "round budget exhausted after the planned cycles"
 
         return AdaptiveReport(
-            target=getattr(self.adapter, "name", self.adapter.__class__.__name__),
+            target=getattr(
+                self.adapter, "url", f"{self.adapter.name}:{getattr(self.adapter, 'profile', '')}"
+            ),
             rounds=trace,
             total_generated=total_generated,
             total_rejected=total_rejected,
