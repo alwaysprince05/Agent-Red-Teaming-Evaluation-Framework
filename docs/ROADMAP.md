@@ -40,6 +40,13 @@
 - [x] Generator asks for user-only turns (fewer rejected proposals); one-line rejection messages
 - [x] Adaptive report shows the full target label (e.g. `llm:strong@qwen2.5:3b`)
 
+### Delivered in v2.0.2
+
+- [x] Polite declines ("I'd rather not...", "I must refuse") count as refusals; leaks are still
+      caught by canary and content rules
+- [x] Each adaptive session writes its suites to its own folder, so later sessions never
+      overwrite earlier evidence
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~

@@ -171,8 +171,10 @@ class TestSafety:
             output_dir=tmp_path / "runs",
         )
         suites_dir = tmp_path / "runs" / "adaptive_suites"
-        suites = list(suites_dir.glob("*.yaml"))
-        assert suites  # fully inspectable: one reviewable suite per round on disk
+        sessions = [d for d in suites_dir.iterdir() if d.is_dir()]
+        assert len(sessions) == 1  # one folder per session, never shared
+        suites = list(sessions[0].glob("*.yaml"))
+        assert len(suites) == 2  # fully inspectable: one reviewable suite per round on disk
 
 
 
