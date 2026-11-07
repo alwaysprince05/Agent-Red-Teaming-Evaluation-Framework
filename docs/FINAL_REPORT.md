@@ -26,12 +26,12 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 | PRD item | Delivered as |
 |---|---|
 | Python package with core execution & evaluation modules | `agent_redteam` installable package (pyproject.toml, `agent-redteam` console script) |
-| Agent adapter interface + working adapter | `AgentAdapter` ABC; `mock:weak`, `mock:strong`, `HTTPAgentAdapter` |
+| Agent adapter interface + working adapter | `AgentAdapter` ABC; `llm:weak`, `llm:strong` (model-driven), `mock:weak`, `mock:strong`, `HTTPAgentAdapter` |
 | Configuration and schema validation | Pydantic v2 schemas with strict validation; YAML/JSON suite loader rejecting malformed cases with precise errors |
 | Deterministic evaluator | `evaluators/deterministic.py` — keyword/regex/refusal/tool-allowlist checks with evidence capture |
 | Configurable semantic evaluator | `evaluators/llm_judge.py` — OpenAI-compatible judge, temperature 0, structured JSON verdicts, explicit error handling |
 | Severity and finding model | `Severity` (low→critical), `Finding` with reproduction steps, remediation guidance and evidence |
-| Automated unit & integration tests | 86 pytest tests: schemas, suite, adapters, engine, evaluator, runner, compare, reports, API, LLM judge, dashboard |
+| Automated unit & integration tests | 224 offline pytest tests (+1 opt-in live test): schemas, suite, adapters, LLM agent, planner, adaptive loop, engine, evaluator, runner, compare, reports, API, LLM judge, dashboard |
 | Dockerfile & reproducible setup | Non-root slim-image Dockerfile + `.dockerignore` + pinned deps in pyproject |
 
 ## 9.3 Backend / API Deliverables
@@ -63,7 +63,7 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 | Optional CI evaluation quality gate | `run` exits 1 when violations exist — usable as a release gate |
 | README with setup, suite format, usage | [README.md](../README.md) |
 | Architecture diagram & HLD/LLD | [docs/ARCHITECTURE.md](ARCHITECTURE.md) (pipeline, components, data flow, design decisions) |
-| Final demo & presentation | 3-command demo: `run` on `mock:weak` → `run` on `mock:strong` → `compare`; plus HTML dashboard |
+| Final demo & presentation | Offline pipeline check (`run` on `mock:weak` / `mock:strong`), then real-model runs on `llm:weak` / `llm:strong`, an `adaptive` session with the LLM planner, and the HTML dashboard comparing both targets |
 | Limitations, safety boundaries, responsible use | [docs/RESPONSIBLE_USE.md](RESPONSIBLE_USE.md) + README limitations section |
 
 ---
@@ -81,11 +81,17 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 9. JSON/CSV/Markdown exports + HTML dashboard ✅
 10. Safe execution controls (timeouts, rate limits, isolation, secret handling) ✅
 
-## Stretch goals delivered ahead of schedule
+## Stretch goals (PRD §2.2): 5 of 8 delivered
 
-- ✅ **Dashboard for historical scores, trends, findings, regressions** (PRD §2.2-5)
-- ✅ **CI/CD quality-gate support** via exit codes (PRD §2.2-6)
-- ◻ Remaining stretch items tracked in [docs/ROADMAP.md](ROADMAP.md)
+- ✅ **Automated attack generation and mutation** (§2.2-1): `generate` and `adaptive` with the LLM planner
+- ✅ **Indirect prompt injection** through file and tool content (§2.2-2): `indirect_injection` cases
+- ✅ **Tool-use safety evaluation** (§2.2-3): `tool_allowlist` policies on simulated tools
+- ✅ **Dashboard for historical scores, trends, findings, regressions** (§2.2-5)
+- ✅ **CI/CD quality-gate support** via exit codes (§2.2-6)
+- ◻ Memory and cross-session contamination tests (§2.2-4)
+- ◻ Plugin architecture for custom attacks, evaluators and adapters (§2.2-7); custom suites and the
+  `AgentAdapter` base class cover part of this
+- ◻ Adapters for public safety/red-team datasets (§2.2-8)
 
 ## v2.0.0: agents that think for themselves (mentor feedback)
 
@@ -122,7 +128,22 @@ cannot raise; tests are offline and hermetic (224 passing, plus 1 opt-in live te
 - All artifacts local; `runs/` and `.env` git-ignored; no secrets in the repo.
 - Attack strings in the suite and mock agents are fictional test data.
 
+## Not implemented (future work)
+
+These PRD items are not built yet:
+
+- **Attack categories (§4.2):** the suite covers 6 of the 10 listed categories. Not covered: goal
+  and scope manipulation, memory attacks, hallucination / factual robustness, and availability /
+  abuse resistance.
+- **Human override (§4.5-5):** reviewers cannot yet override or annotate a verdict inside the
+  tool; findings show the agent's reply so a reviewer can judge them manually.
+- **Concurrent evaluation (§3.3):** cases run one at a time under the rate limit.
+- **Token / API cost (§3.3, §4.4):** not recorded. Latency (mean and p95) and throughput are
+  measured by `benchmark`.
+- **Object-store backend (§2.3):** runs and reports are stored as local files only.
+
 ## Signature readiness
 
-The implementation, tests, documentation and evaluation artifacts required by the PRD are
-complete and verified. Ready for mentor review and final demonstration.
+All 10 must-have features (§2.1) are implemented, tested and verified, along with 5 of the 8
+stretch goals. The items above are documented as future work. Ready for mentor review and final
+demonstration.
