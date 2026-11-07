@@ -16,6 +16,12 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
 
 ![Dashboard comparing the weak and strong agents](docs/images/dashboard.png)
 
+**Contents:** [Highlights](#highlights) · [Results](#results-on-a-real-llm-agent) ·
+[Project status](#project-status) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
+[CLI](#cli-reference) · [Dashboard](#dashboard) · [Targets](#targets) · [Safety](#safety-model) ·
+[Grading](#grading) · [REST API](#rest-api) · [Development](#development) ·
+[Limitations](#limitations)
+
 ## Highlights
 
 - **Nothing hardcoded on either side.** The target (`llm:weak` / `llm:strong`) is a model that
@@ -27,7 +33,7 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
   authorization; the attacker has hard budgets it cannot raise.
 - **Fair comparisons.** `weak` and `strong` share one system prompt and differ only by
   guardrails, so results measure the guardrails alone.
-- **Engineering quality.** 224 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 228 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API, offline HTML dashboard, Markdown/CSV reports.
 
 ## Results on a real LLM agent
@@ -53,6 +59,18 @@ one missed violation and a few false alarms on vague answers); `--use-llm-judge`
 grading. A 3B model is a weak attacker that mostly paraphrases the seed examples. Three repeats
 is a small sample: treat the results as indicative. The mock agents (`mock:weak` 13/13,
 `mock:strong` 0/13) are scripted and only demonstrate the pipeline.
+
+## Project status
+
+Measured against the project PRD (full mapping with evidence in
+[docs/FINAL_REPORT.md](docs/FINAL_REPORT.md)):
+
+| Scope | Status |
+|---|---|
+| Must-have features (PRD §2.1) | **10 / 10** implemented and tested |
+| Stretch goals (PRD §2.2) | **5 / 8**: attack generation, indirect injection, tool-use safety, dashboard, CI gate |
+| Attack categories (PRD §4.2) | **6 / 10**: prompt injection, jailbreak, data leakage, unsafe tool use, multi-turn, indirect injection |
+| Not implemented | Memory, goal-manipulation, hallucination and availability attacks; reviewer override of verdicts; concurrent execution; token-cost tracking; plugin system; public dataset adapters; object-store backend |
 
 ## How it works
 
@@ -106,6 +124,9 @@ agent-redteam adaptive --target llm:strong --max-rounds 3 --cases-per-round 4
 agent-redteam dashboard && open reports/out/dashboard.html
 ```
 
+`dashboard` reads every run under `runs/`. To build a page from a chosen set of runs only, use
+`agent-redteam dashboard --runs-dir <dir> --out <file.html>`.
+
 Keep `--cases-per-round` at 4 with a 3B model; larger batches often come back as invalid JSON,
 and the round falls back to built-in mutations. `run` and `adaptive` exit with code `1` when
 violations are found, so they work as a CI quality gate.
@@ -126,6 +147,20 @@ To reproduce the results table: `python scripts/llm_experiment.py --repeats 3 --
 | `list-attacks` | Built-in suites and safe targets |
 
 Run `agent-redteam <command> --help` for every option.
+
+## Dashboard
+
+`agent-redteam dashboard` writes one self-contained HTML file: no JavaScript, no network
+requests, light and dark mode. It shows:
+
+- **Headline:** attack success rate per agent from its latest fixed-suite run, and the gap between them.
+- **Where each agent fails:** success rate per attack category, most vulnerable first.
+- **Runs and adaptive sessions:** every run labelled fixed suite or adaptive round, and the
+  categories the planner chose in each session.
+- **Findings:** each violation with the agent and run type, severity, the agent's reply (long
+  replies expand with "show full reply") and the evidence. Canary leaks carry a **proven leak** badge.
+
+Agent replies are untrusted model output and are HTML-escaped.
 
 ## Targets
 
@@ -215,7 +250,7 @@ agent_redteam/
   reports/     Markdown/CSV reports, HTML dashboard
   api/         FastAPI service
   cli.py       command-line interface
-tests/         224 offline tests + 1 opt-in live test
+tests/         228 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, final report, roadmap, results
 ```
@@ -224,7 +259,7 @@ docs/          architecture, performance, responsible use, final report, roadmap
 
 ```bash
 ruff check .                              # lint
-pytest                                    # 224 tests, fully offline
+pytest                                    # 228 tests, fully offline
 RUN_LIVE_LLM=1 pytest tests/test_live_llm.py   # optional, needs a local model
 docker build -t agent-redteam . && docker run -p 8000:8000 agent-redteam
 ```
@@ -240,12 +275,14 @@ CI runs lint, tests and a wheel build on Python 3.11, 3.12 and 3.13. Tests clear
 - Results with a 3B model describe that model, not LLMs in general; it is also a weak attacker.
 - Real models vary between runs even at temperature 0; compare repeated runs, not single runs.
 - Multi-turn cases are fixed sequences; memory and cross-session attacks are not covered yet.
+- The suite covers 6 of the 10 attack categories in the PRD; see [Project status](#project-status).
+- Cases run one at a time under the rate limit; there is no concurrent execution or token-cost tracking.
 - The REST API keeps its run registry in memory; `runs/` is the durable store.
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — components, pipeline and design decisions
-- [Final report](docs/FINAL_REPORT.md) — deliverables with evidence, including the v2 changes
+- [Final report](docs/FINAL_REPORT.md) — PRD deliverables with evidence, v2 changes and what is not implemented
 - [Responsible use](docs/RESPONSIBLE_USE.md) — authorization rules and safety boundaries
 - [Performance](docs/PERFORMANCE.md) — benchmark methodology and measurements
 - [Roadmap](docs/ROADMAP.md) — shipped features and planned work
