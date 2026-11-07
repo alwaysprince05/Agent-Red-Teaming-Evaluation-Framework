@@ -3,9 +3,9 @@
 **Project:** Agent Red-Teaming & Evaluation Framework
 **Student:** Prince Kumar Maurya (Roll No 240410700103, 2026, Gen AI track, Group G132)
 **Mentor:** Anurag Sarkar
-**Version:** 2.2.0 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
+**Version:** 2.2.1 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
 
-Verification state at v2.2.0: **224 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
+Verification state at v2.2.1: **228 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
 green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 
 ---
@@ -31,7 +31,7 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 | Deterministic evaluator | `evaluators/deterministic.py` — keyword/regex/refusal/tool-allowlist checks with evidence capture |
 | Configurable semantic evaluator | `evaluators/llm_judge.py` — OpenAI-compatible judge, temperature 0, structured JSON verdicts, explicit error handling |
 | Severity and finding model | `Severity` (low→critical), `Finding` with reproduction steps, remediation guidance and evidence |
-| Automated unit & integration tests | 224 offline pytest tests (+1 opt-in live test): schemas, suite, adapters, LLM agent, planner, adaptive loop, engine, evaluator, runner, compare, reports, API, LLM judge, dashboard |
+| Automated unit & integration tests | 228 offline pytest tests (+1 opt-in live test): schemas, suite, adapters, LLM agent, planner, adaptive loop, engine, evaluator, runner, compare, reports, API, LLM judge, dashboard |
 | Dockerfile & reproducible setup | Non-root slim-image Dockerfile + `.dockerignore` + pinned deps in pyproject |
 
 ## 9.3 Backend / API Deliverables
@@ -119,7 +119,7 @@ weakness of a 3B attacker, are listed in the README.
 
 Safety of the new parts: tools are simulated (never executed); model endpoints use the
 same authorization as HTTP targets; planner output is strictly validated with budgets it
-cannot raise; tests are offline and hermetic (224 passing, plus 1 opt-in live test).
+cannot raise; tests are offline and hermetic (228 passing, plus 1 opt-in live test).
 
 ## Safety summary
 
