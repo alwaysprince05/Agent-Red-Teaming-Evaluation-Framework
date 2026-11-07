@@ -1,7 +1,7 @@
 # Agent Red-Teaming & Evaluation Framework
 
 ![CI](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/badge/release-v2.2.0-blue)
+![Release](https://img.shields.io/badge/release-v2.2.1-blue)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

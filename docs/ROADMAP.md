@@ -67,6 +67,12 @@
       a headline number, a three-number metrics strip led by proven leaks, a horizontal chart sorted
       by vulnerability, compact header; the trend chart appears only when a target has repeated runs
 
+### Delivered in v2.2.1
+
+- [x] Dashboard findings name the agent and run type; long replies expand with "show full reply";
+      titles end at a whole word; headline reads "N pts lower"; ids and dates no longer wrap
+- [x] Final report and README state PRD coverage and what is not implemented
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~
