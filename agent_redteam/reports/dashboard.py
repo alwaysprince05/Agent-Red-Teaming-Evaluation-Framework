@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from agent_redteam import __version__
+from agent_redteam.core.runner import shorten_text
 from agent_redteam.core.schemas import RunSummary
 
 _REPLY_CHARS = 180
@@ -143,6 +144,18 @@ svg .val { fill: var(--text2); font-size: 11px; font-weight: 600; }
 footer { margin-top: 3rem; padding-top: 1.1rem; border-top: 1px solid var(--line); color: var(--muted);
          font-size: .8rem; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem;
          justify-content: space-between; }
+.nowrap { white-space: nowrap; }
+.who { font-weight: 600; white-space: nowrap; }
+.who .badge { margin-left: .3rem; }
+details.reply summary { cursor: pointer; list-style: none; }
+details.reply summary::-webkit-details-marker { display: none; }
+details.reply summary .more { color: var(--accent); font-size: .78rem; margin-left: .3rem;
+                              white-space: nowrap; }
+details.reply[open] summary .short { display: none; }
+details.reply:not([open]) .full { display: none; }
+details.reply[open] summary .more::after { content: 'show less'; }
+details.reply:not([open]) summary .more::after { content: 'show full reply'; }
+.chart svg { min-width: 560px; }
 @media (max-width: 760px) {
   .wrap { padding: 0 1rem; }
   .hero { grid-template-columns: 1fr; }
@@ -313,9 +326,9 @@ def _headline(views: list[RunView]) -> str:
         same = wv.summary.metrics.executed == bv.summary.metrics.executed
         attacks = f"the same {bv.summary.metrics.executed} attacks" if same else "the fixed suite"
         delta = (
-            f"<div class='delta'><div class='big'>&minus;{gap:.1f}<small> pts</small></div>"
-            f"<div class='cap'><b>{_esc(_display(best)[0])}</b> vs <b>{_esc(_display(worst)[0])}</b>: "
-            f"lower attack success on {attacks}.</div></div>"
+            f"<div class='delta'><div class='big'>{gap:.1f}<small> pts lower</small></div>"
+            f"<div class='cap'>Attack success of <b>{_esc(_display(best)[0])}</b> vs "
+            f"<b>{_esc(_display(worst)[0])}</b> on {attacks}.</div></div>"
         )
     hero = ""
     if ranked:
@@ -335,7 +348,7 @@ def _headline(views: list[RunView]) -> str:
         f"<div class='{'alert' if leaks else ''}'><div class='num'>{leaks}</div>"
         "<div class='lbl'>Proven leaks (canary secret in a reply)</div></div>"
         f"<div><div class='num'>{violations} <span class='muted'>/ {executed}</span></div>"
-        "<div class='lbl'>Violations across all runs</div></div>"
+        f"<div class='lbl'>Violations across all {len(views)} runs</div></div>"
         f"<div><div class='num'>{rounds}</div><div class='lbl'>AI-planned rounds in {sessions} "
         f"session{'s' if sessions != 1 else ''}</div></div>"
         "</div>"
@@ -398,7 +411,7 @@ def _category_chart(views: list[RunView]) -> str:
                 f"<text class='val' x='{left + bw + 6:.1f}' y='{y + bar_h - 2:.1f}'>{r * 100:.0f}%</text>"
             )
     out.append("</svg>")
-    return f"<div class='panel'>{_legend(ranked)}{''.join(out)}</div>"
+    return f"<div class='panel chart'>{_legend(ranked)}{''.join(out)}</div>"
 
 
 def _has_trend(views: list[RunView]) -> bool:
@@ -454,10 +467,10 @@ def _runs_table(views: list[RunView]) -> str:
         s, m = v.summary, v.summary.metrics
         rows.append(
             "<tr>"
-            f"<td><code>{_esc(s.run_id)}</code></td>"
+            f"<td class='nowrap'><code>{_esc(s.run_id)}</code></td>"
             f"<td>{_type_badge(v)}</td>"
-            f"<td>{time.strftime('%Y-%m-%d %H:%M', time.localtime(s.created_at))}</td>"
-            f"<td>{_esc(s.target)}</td>"
+            f"<td class='nowrap'>{time.strftime('%Y-%m-%d %H:%M', time.localtime(s.created_at))}</td>"
+            f"<td class='nowrap'>{_esc(s.target)}</td>"
             f"<td>{m.violations} / {m.executed}</td>"
             f"<td>{_pct(m.attack_success_rate)}<div class='bar'>"
             f"<div style='width:{m.attack_success_rate * 100:.0f}%'></div></div></td>"
@@ -500,7 +513,8 @@ def _sessions(views: list[RunView]) -> str:
         total_v = sum(r.summary.metrics.violations for r in rounds)
         total_e = sum(r.summary.metrics.executed for r in rounds)
         rows.append(
-            f"<tr><td><code>{_esc(sid)}</code></td><td>{_esc(rounds[0].summary.target)}</td>"
+            f"<tr><td class='nowrap'><code>{_esc(sid)}</code></td>"
+            f"<td class='nowrap'>{_esc(rounds[0].summary.target)}</td>"
             f"<td>{len(rounds)}</td><td>{cats}</td><td>{total_v} / {total_e}</td></tr>"
         )
     return (
@@ -511,31 +525,51 @@ def _sessions(views: list[RunView]) -> str:
     )
 
 
+def _finding_title(title: str) -> str:
+    """Older runs stored titles cut mid-word at 80 characters; trim those to a whole word."""
+    category, sep, objective = title.partition(": ")
+    if sep and len(objective) == 80:
+        return f"{category}: {shorten_text(objective, 79)}"
+    return title
+
+
+def _reply_cell(reply: str) -> str:
+    """The reply, with long ones collapsed to a preview that expands without JavaScript."""
+    if not reply:
+        return f"<div class='reply'>{NO_REPLY}</div>"
+    if len(reply) <= _REPLY_CHARS:
+        return f"<div class='reply'>{_esc(reply)}</div>"
+    return (
+        "<details class='reply'><summary>"
+        f"<span class='short'>{_esc(shorten_text(reply, _REPLY_CHARS))}</span><span class='more'></span>"
+        f"</summary><div class='full'>{_esc(reply)}</div></details>"
+    )
+
+
 def _findings(views: list[RunView]) -> str:
     rows: list[str] = []
     for v in reversed(views):  # newest first
         for f in v.summary.findings:
             reply = v.replies.get(f.test_id, "")
-            if len(reply) > _REPLY_CHARS:
-                reply = reply[:_REPLY_CHARS] + "…"
             evidence = "; ".join(e.detail for e in f.evidence[:2])
             leak = " <span class='badge b-leak'>proven leak</span>" if _is_leak(f) else ""
             row_cls = f"sev-{_esc(f.severity.value)}" + (" leak" if _is_leak(f) else "")
             rows.append(
                 f"<tr class='{row_cls}'>"
-                f"<td><code>{_esc(f.test_id)}</code>"
-                f"<div class='muted'><code>{_esc(v.summary.run_id)}</code></div></td>"
+                f"<td class='nowrap'><code>{_esc(f.test_id)}</code></td>"
+                f"<td><div class='who' title='{_esc(v.summary.target)} · run {_esc(v.summary.run_id)}'>"
+                f"{_esc(_display(v.summary.target)[0])}</div>{_type_badge(v)}</td>"
                 f"<td><span class='badge b-{_esc(f.severity.value)}'>{_esc(f.severity.value)}</span>{leak}"
                 f"<div class='muted'>{_esc(f.category)}</div></td>"
-                f"<td>{_esc(f.title)}</td>"
-                f"<td class='reply'>{_esc(reply) or NO_REPLY}</td>"
+                f"<td>{_esc(_finding_title(f.title))}</td>"
+                f"<td>{_reply_cell(reply)}</td>"
                 f"<td class='muted'>{_esc(evidence)}</td>"
                 "</tr>"
             )
     if not rows:
         return "<p class='muted'>No findings recorded across runs.</p>"
     return (
-        "<div class='panel'><table><thead><tr><th>Test</th><th>Severity</th><th>Finding</th>"
+        "<div class='panel'><table><thead><tr><th>Test</th><th>Agent</th><th>Severity</th><th>Finding</th>"
         "<th>Agent reply</th><th>Evidence</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
     )
 

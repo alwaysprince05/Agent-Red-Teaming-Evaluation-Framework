@@ -77,12 +77,20 @@ def _build_finding(case: TestCase, result: EvaluationResult, record) -> Finding:
         id=new_finding_id(),
         test_id=case.id,
         category=category,
-        title=f"{category}: {case.objective[:80]}",
+        title=f"{category}: {shorten_text(case.objective, 80)}",
         severity=result.severity,
         reproduction=repro,
         remediation=_SEVERITY_REMEDIATION.get(category, _FALLBACK_REMEDIATION),
         evidence=result.evidence,
     )
+
+
+def shorten_text(text: str, limit: int) -> str:
+    """Cut text at a word boundary so it never ends mid-word."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0] or text[:limit]
+    return cut.rstrip(" ,.;:") + "…"
 
 
 def _aggregate_metrics(
