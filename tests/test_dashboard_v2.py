@@ -8,9 +8,9 @@ import pytest
 
 from agent_redteam.adapters.base import AgentAdapter
 from agent_redteam.core.adaptive import AdaptiveAgent, AdaptiveLimit
-from agent_redteam.core.runner import RunOptions, execute_run
+from agent_redteam.core.runner import RunOptions, execute_run, shorten_text
 from agent_redteam.core.schemas import AgentResponse
-from agent_redteam.reports.dashboard import LEGACY_SESSION, _load_views, generate_dashboard
+from agent_redteam.reports.dashboard import LEGACY_SESSION, _finding_title, _load_views, generate_dashboard
 
 
 class ScriptedAgent(AgentAdapter):
@@ -60,7 +60,8 @@ def test_headline_uses_latest_fixed_run_per_target_not_adaptive_rounds(mixed_run
 
 def test_runs_are_labelled_by_type(mixed_runs):
     text = html_of(mixed_runs)
-    assert text.count("b-fixed'>Fixed suite") == 2
+    runs_table = text.split("<h2>Runs</h2>")[1].split("<h2>")[0]
+    assert runs_table.count("b-fixed'>Fixed suite") == 2
     assert "Adaptive · round 1/2" in text and "Adaptive · round 2/2" in text
 
 
@@ -139,7 +140,7 @@ def test_footer_and_header_show_version(mixed_runs):
 
 def test_comparison_states_the_gap(mixed_runs):
     headline = html_of(mixed_runs).split("<h2>")[0]
-    assert "&minus;100.0<small> pts</small>" in headline  # mock:strong 0% vs mock:weak 100%
+    assert "100.0<small> pts lower</small>" in headline  # mock:strong 0% vs mock:weak 100%
     assert "<b>Strong agent</b> vs <b>Weak agent</b>" in headline
     assert "the same 13 attacks" in headline
 
@@ -167,3 +168,32 @@ def test_categories_sorted_most_vulnerable_first(mixed_runs):
 def test_readable_names_keep_the_exact_target_visible(mixed_runs):
     headline = html_of(mixed_runs).split("<h2>")[0]
     assert "Weak agent" in headline and "<code>mock:weak</code>" in headline
+
+
+def test_findings_name_the_agent_and_run_type(mixed_runs):
+    findings = html_of(mixed_runs).split("<h2>Findings (newest first)</h2>")[1]
+    assert "<th>Agent</th>" in findings
+    assert "<div class='who'" in findings and ">Weak agent</div>" in findings
+    assert "b-fixed'>Fixed suite" in findings
+
+
+def test_long_reply_is_collapsed_and_expandable(tmp_path, suite_path):
+    opts = RunOptions(rate_limit_s=0.0, output_dir=tmp_path)
+    long_reply = "word " * 100 + "END-OF-REPLY"
+    execute_run(suite_path, ScriptedAgent(long_reply, "chatty"), opts, run_id="chatty")
+    text = html_of(tmp_path)
+    assert "<details class='reply'>" in text
+    assert "END-OF-REPLY" in text  # full reply is kept, not cut off
+    assert "<script" not in text.lower()
+
+
+def test_shorten_text_cuts_at_a_word():
+    assert shorten_text("short", 80) == "short"
+    assert shorten_text("alpha beta gamma", 12) == "alpha beta…"
+    assert shorten_text("x" * 20, 10) == "x" * 10 + "…"
+
+
+def test_old_mid_word_titles_are_trimmed():
+    objective = ("a" * 70) + " embedded secrets"
+    assert _finding_title("jailbreak: " + objective[:80]) == "jailbreak: " + "a" * 70 + "…"
+    assert _finding_title("jailbreak: short objective") == "jailbreak: short objective"
