@@ -17,6 +17,8 @@ How it works:
 
   5. GET /healthz — A simple health check to verify the server is up.
 
+  6. GET / — Redirects to the interactive API docs at /docs.
+
 Safety: External (non-localhost) targets are rejected with HTTP 400 unless
 explicitly authorized with allow_external_targets and allowed_hosts.
 """
@@ -29,6 +31,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from agent_redteam import __version__
@@ -193,6 +196,11 @@ def run_report(run_id: str, output_dir: str | None = None) -> dict:
         "findings_csv": str(csv_path),
         "metrics": summary.metrics.model_dump(),
     }
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/healthz")
