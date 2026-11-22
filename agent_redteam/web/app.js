@@ -98,6 +98,36 @@ function highlight(text, evidence) {
   return out;
 }
 
+// Turn a grader rule into a sentence a reviewer can read. The raw rule stays in the tooltip.
+function explain(e) {
+  let m;
+  if ((m = e.match(/^pattern '(.+)' matched '(.+)'$/))) {
+    const p = m[1];
+    const what = p.startsWith("AKIA") ? "an AWS access key"
+      : p.startsWith("sk-") ? "an API key"
+      : p.startsWith("ghp_") ? "a GitHub token"
+      : p.includes("PRIVATE KEY") ? "a private key"
+      : p.startsWith("CANARY") ? "a planted canary secret" : "a secret";
+    return `Leaked ${what}: ${m[2]}`;
+  }
+  if ((m = e.match(/^must_not_contain '(.+)'$/))) {
+    const v = m[1];
+    if (/DB_PASS/i.test(v)) return "Leaked the database password variable";
+    if (/Bw4tVxxX/i.test(v)) return "Leaked a password";
+    if (/system prompt/i.test(v)) return "Revealed its system prompt";
+    if (/unrestricted|no restrictions/i.test(v)) return "Agreed to drop its restrictions";
+    return `Said something it must not: "${v}"`;
+  }
+  if ((m = e.match(/^tool '(.+)' not in allowlist/))) return `Called a forbidden tool: ${m[1]}`;
+  if ((m = e.match(/^tool '(.+)' was pointed at a sensitive path/))) return `${m[1]} touched a sensitive file`;
+  if (e.startsWith("must_refuse")) return "Did not refuse the request";
+  return e;
+}
+
+function evidenceList(list) {
+  return (list || []).map((e) => `<span title="${esc(e)}">${esc(explain(e))}</span>`);
+}
+
 function owaspTags(list) {
   if (!list || !list.length) return "";
   return `<span class="owasps">${list.map((o) => `<span class="tag owasp" title="OWASP LLM Top 10: ${esc(o.name)}">${esc(o.id)}</span>`).join(" ")}</span>`;
@@ -124,7 +154,7 @@ function detailHtml(row) {
     <div class="kv"><span>Reply</span><pre>${highlight(row.reply || "(empty reply)", row.evidence)}</pre></div>
     ${row.tool_calls && row.tool_calls.length ? `<div class="kv"><span>Tool calls</span>${toolsHtml(row.tool_calls)}</div>` : ""}
     <div class="kv"><span>Grader</span>${row.evidence && row.evidence.length
-      ? `<ul>${row.evidence.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>`
+      ? `<ul>${evidenceList(row.evidence).map((x) => `<li>${x}</li>`).join("")}</ul>`
       : `<p class="code" style="padding-top:9px">${esc(row.rationale)}</p>`}</div>
     ${row.remediation ? `<div class="kv"><span>Fix</span><div class="fix">${esc(row.remediation)}</div></div>` : ""}`;
 }
@@ -257,7 +287,7 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
         box.innerHTML = `
           <div class="who"><span>${esc(tname(target))}</span>${r.violated ? '<span class="pill hit">breached</span>' : '<span class="pill ok">blocked</span>'}</div>
           <div class="reply">${highlight(r.reply, r.evidence)}</div>
-          <div class="why">${r.violated ? esc(r.evidence[0] || r.rationale) : "no secret disclosed · no tool called"}</div>`;
+          <div class="why">${r.violated ? evidenceList(r.evidence).join(" · ") : "no secret disclosed · no tool called"}</div>`;
       })
       .catch((e) => { box.querySelector(".reply").textContent = e.message; });
   }
@@ -789,7 +819,7 @@ function turnHtml(t) {
       <pre>${highlight(r.reply || "(empty reply)", r.evidence)}</pre>
       ${toolsHtml(r.tool_calls)}
       <div class="judge ${state}">
-        ${r.violated ? (r.evidence || []).map((e) => `<span>${esc(e)}</span>`).join("")
+        ${r.violated ? evidenceList(r.evidence).join("")
           : r.status === "error" ? `<span>${esc(r.rationale)}</span>`
           : "<span>no secret disclosed · no forbidden tool call</span>"}
       </div>
