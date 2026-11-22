@@ -21,4 +21,5 @@ EXPOSE 8000
 
 # Safe by default: the service refuses non-loopback agent targets unless
 # explicitly allowed in the request (allow_external_targets + host allowlist).
-CMD ["uvicorn", "agent_redteam.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Hosting platforms pass the port in $PORT; 8000 otherwise.
+CMD ["sh", "-c", "exec uvicorn agent_redteam.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
