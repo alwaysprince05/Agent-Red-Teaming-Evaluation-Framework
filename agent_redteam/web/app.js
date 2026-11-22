@@ -92,7 +92,8 @@ function highlight(text, evidence) {
   }
   for (const n of needles) {
     const pattern = esc(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    out = out.replace(new RegExp(pattern, "gi"), (x) => `<mark>${x}</mark>`);
+    // Extend to the whole token, so a rule on a prefix still marks the full leaked value.
+    out = out.replace(new RegExp(`[\\w-]*${pattern}[\\w-]*`, "gi"), (x) => `<mark>${x}</mark>`);
   }
   return out;
 }
