@@ -61,6 +61,22 @@ def _is_loopback_host(host: str) -> bool:
     return all(ipaddress.ip_address(info[4][0]).is_loopback for info in infos)
 
 
+# Hosts that are never tested, whatever the flags say: government, military,
+# education and intergovernmental domains, including country forms like gov.in.
+_PROTECTED_TLDS = {"gov", "mil", "edu", "int"}
+_PROTECTED_SECOND_LEVEL = {"gov", "mil", "edu", "ac", "nic"}
+
+
+def is_protected_host(host: str) -> bool:
+    labels = [p for p in host.lower().rstrip(".").split(".") if p]
+    if len(labels) < 2:
+        return False
+    if labels[-1] in _PROTECTED_TLDS:
+        return True
+    # e.g. india.gov.in, mod.gov.uk, iitb.ac.in; only when the last label is a country code
+    return len(labels[-1]) == 2 and labels[-2] in _PROTECTED_SECOND_LEVEL
+
+
 def validate_external_target(
     url: str,
     *,
@@ -70,6 +86,7 @@ def validate_external_target(
     """Validate an HTTP(S) target before any request is made.
 
     Rules:
+      - government / military / education / intergovernmental hosts are always refused;
       - loopback targets (localhost/127.0.0.1) are always allowed;
       - any external host requires allow_external=True AND the host to be in
         host_allowlist (if a non-empty allowlist is provided).
@@ -80,6 +97,11 @@ def validate_external_target(
     host = parts.hostname or ""
     if not host:
         raise TargetNotAuthorizedError("target URL has no hostname")
+    if is_protected_host(host):
+        raise TargetNotAuthorizedError(
+            f"refusing target {host!r}: government, military, education and intergovernmental "
+            "domains are blocked by a built-in guardrail that cannot be turned off"
+        )
     if _is_loopback_host(host):
         return url
     if not allow_external:
