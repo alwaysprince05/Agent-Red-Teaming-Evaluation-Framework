@@ -63,6 +63,7 @@ async function api(path, options = {}) {
 const tname = (t) => (TARGETS[t] ? TARGETS[t].name : t);
 const pct = (x) => `${Math.round((x || 0) * 100)}%`;
 const code = (cat) => (CATS[cat] ? CATS[cat].code : "··");
+const catTag = (cat) => `<span class="tag cat-${esc(cat)}">${code(cat)}</span>`;
 const catLabel = (id) => ((config.categories.find((c) => c.id === id) || {}).label || id);
 
 function grade(asr) {
@@ -172,7 +173,7 @@ function entryHtml(row, stamp, fresh) {
       <div class="log-row" data-toggle>
         <span class="t">${esc(stamp)}</span>
         <span class="id">${esc(row.test_id)}</span>
-        <span class="c"><span class="tag">${code(row.category)}</span> <span class="muted">${esc(row.category_label)}</span></span>
+        <span class="c">${catTag(row.category)} <span class="muted">${esc(row.category_label)}</span></span>
         <span class="a">${esc(row.attack)}</span>
         <span class="v">${verdict(row)}</span>
       </div>
@@ -242,7 +243,7 @@ async function renderHome() {
         <tr><th style="width:70px">Code</th><th style="width:210px">Category</th><th>Technique</th><th style="width:130px">OWASP LLM</th><th style="width:60px;text-align:right">Cases</th></tr>
         ${config.categories.map((c) => `
           <tr>
-            <td><span class="tag cat-${esc(c.id)}">${code(c.id)}</span></td>
+            <td>${catTag(c.id)}</td>
             <td>${esc(c.label)}</td>
             <td class="muted">${esc(CATS[c.id] ? CATS[c.id].desc : "")}</td>
             <td>${owaspTags(c.owasp)}</td>
@@ -370,7 +371,7 @@ function renderScan() {
             <label class="opt">
               <input type="checkbox" name="cat" value="${esc(c.id)}" checked>
               <div><h3>${esc(c.label)}</h3><div class="d">${esc(CATS[c.id] ? CATS[c.id].desc : "")}</div></div>
-              <span class="tag">${code(c.id)} · ${c.count}</span>
+              <span class="tag cat-${esc(c.id)}">${code(c.id)} · ${c.count}</span>
             </label>`).join("")}
         </div>
       </div>
@@ -601,7 +602,7 @@ async function renderReport(runId) {
       <tr><th style="width:70px">Code</th><th>Category</th><th style="width:120px">OWASP LLM</th><th style="width:90px">Breached</th><th style="width:32%">Rate</th></tr>
       ${Object.entries(m.by_category).map(([id, c]) => {
         const rate = c.violation_rate || 0;
-        return `<tr><td><span class="tag">${code(id)}</span></td><td>${esc(catLabel(id))}</td><td>${owaspTags(owaspFor(id))}</td>
+        return `<tr><td>${catTag(id)}</td><td>${esc(catLabel(id))}</td><td>${owaspTags(owaspFor(id))}</td>
           <td class="num">${c.violations} / ${c.total - c.errors}</td>
           <td><div style="display:flex;gap:10px;align-items:center"><div class="meter${rate === 0 ? " zero" : ""}" style="flex:1"><i style="width:${rate * 100}%"></i></div><span class="mono num" style="width:38px;text-align:right">${pct(rate)}</span></div></td></tr>`;
       }).join("")}
@@ -728,7 +729,7 @@ async function renderCompare(query) {
         <tr><th>Case</th><th>Category</th><th style="width:80px">Before</th><th style="width:80px">After</th><th style="width:120px">Change</th></tr>
         ${ids.map((id) => {
           const ref = after[id] || before[id];
-          return `<tr><td class="mono">${esc(id)}</td><td><span class="tag">${code(ref.category)}</span> <span class="muted">${esc(ref.category_label)}</span></td>
+          return `<tr><td class="mono">${esc(id)}</td><td>${catTag(ref.category)} <span class="muted">${esc(ref.category_label)}</span></td>
             <td>${dot(before[id])}</td><td>${dot(after[id])}</td><td>${change(before[id], after[id])}</td></tr>`;
         }).join("")}
       </table></div>`;
@@ -849,7 +850,7 @@ function renderPlayground() {
       <div class="card">
         <div class="card-h"><h3>Presets</h3></div>
         ${PRESETS.map((p, i) => `<button class="preset" data-i="${i}">
-          ${esc(p.label)}<span class="tag">${code(p.category)}</span><small>${esc(p.text)}</small></button>`).join("")}
+          ${esc(p.label)}${catTag(p.category)}<small>${esc(p.text)}</small></button>`).join("")}
       </div>
       <div style="display:grid;gap:16px">
         <div class="card composer">
