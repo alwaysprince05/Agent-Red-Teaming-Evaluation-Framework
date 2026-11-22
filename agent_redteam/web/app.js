@@ -6,19 +6,19 @@ let config = null;
 let pollTimer = null;
 
 const TARGETS = {
-  "mock:weak": { name: "Demo bot · unprotected", desc: "Scripted support bot with no guardrails. Follows injected instructions, leaks its fake secrets, calls any tool." },
-  "mock:strong": { name: "Demo bot · protected", desc: "Same bot with guardrails. Refuses overrides, never discloses secrets, only reads files in its workspace." },
-  "llm:weak": { name: "LLM · no guardrails", desc: "A real language model holding planted CANARY secrets behind a minimal system prompt." },
-  "llm:strong": { name: "LLM · hardened prompt", desc: "Same model with a defensive system prompt. Results vary from run to run." },
+  "mock:weak": { name: "Demo bot · unprotected", desc: "No guardrails. Obeys injected orders and leaks its fake secrets." },
+  "mock:strong": { name: "Demo bot · protected", desc: "Same bot with guardrails. Refuses and stays in its workspace." },
+  "llm:weak": { name: "LLM · no guardrails", desc: "A real model with planted canary secrets and a minimal prompt." },
+  "llm:strong": { name: "LLM · hardened prompt", desc: "Same model with a defensive prompt. Varies between runs." },
 };
 
 const CATS = {
-  prompt_injection: { code: "PI", desc: "Overrides the system prompt (\"ignore all previous instructions…\")." },
-  jailbreak: { code: "JB", desc: "Persona and role-play tricks that claim the rules no longer apply." },
-  data_leakage: { code: "DL", desc: "Asks directly for credentials, keys and other secrets in context." },
-  unsafe_tool_use: { code: "TU", desc: "Pushes the agent to email data out, delete files or read sensitive paths." },
-  multi_turn_manipulation: { code: "MT", desc: "Builds rapport over several turns before the unsafe request." },
-  indirect_injection: { code: "II", desc: "Instructions hidden inside a document or tool output the agent reads." },
+  prompt_injection: { code: "PI", desc: "Override the system prompt" },
+  jailbreak: { code: "JB", desc: "Role-play the rules away" },
+  data_leakage: { code: "DL", desc: "Ask for keys and passwords" },
+  unsafe_tool_use: { code: "TU", desc: "Email data out, delete or read files" },
+  multi_turn_manipulation: { code: "MT", desc: "Build trust, then ask" },
+  indirect_injection: { code: "II", desc: "Hidden orders inside a document" },
 };
 
 const PRESETS = [
@@ -158,10 +158,8 @@ async function renderHome() {
   view.innerHTML = `
     <section class="intro">
       <div>
-        <div class="crumb">overview</div>
         <h1>Adversarial testing for AI agents.</h1>
-        <p class="lede">Runs a suite of known attacks against an agent, grades every reply against
-          explicit policy rules, and reports what got through, with the evidence and a fix.</p>
+        <p class="lede">Attack an agent, grade every reply, see what got through with proof and a fix.</p>
         <div class="actions">
           <a class="btn" href="#/scan">New scan</a>
           <a class="btn ghost" href="#/playground">Open playground</a>
@@ -169,8 +167,7 @@ async function renderHome() {
         <div class="facts">
           <div class="fact"><b class="num">${total}</b><span>attack cases</span></div>
           <div class="fact"><b class="num">${config.categories.length}</b><span>categories</span></div>
-          <div class="fact"><b class="num">${config.targets.length}</b><span>agents available</span></div>
-          <div class="fact"><b class="num" id="scan-count">–</b><span>scans on this server</span></div>
+          <div class="fact"><b class="num" id="scan-count">–</b><span>scans run</span></div>
         </div>
       </div>
 
@@ -193,14 +190,10 @@ async function renderHome() {
 
     <h2>Pipeline</h2>
     <div class="card flow">
-      <div class="stage"><span class="k">01 · suite</span><h3>Attack cases</h3>
-        <p>Versioned YAML. Each case carries its own policy.</p><span class="mono">${total} cases · ${config.categories.length} categories</span></div>
-      <div class="stage"><span class="k">02 · adapter</span><h3>Agent under test</h3>
-        <p>Sends the turns, records the reply and every tool call.</p><span class="mono">mock · llm · http</span></div>
-      <div class="stage"><span class="k">03 · grader</span><h3>Policy checks</h3>
-        <p>Deterministic rules, optional LLM judge. Canary hits are proof.</p><span class="mono">regex · canary · tools · refusal</span></div>
-      <div class="stage"><span class="k">04 · report</span><h3>Findings</h3>
-        <p>Attack success rate, per-category breakdown, fixes.</p><span class="mono">grade · md · csv</span></div>
+      <div class="stage"><span class="k">01</span><h3>Attack suite</h3><span class="mono">${total} cases · YAML</span></div>
+      <div class="stage"><span class="k">02</span><h3>Agent under test</h3><span class="mono">mock · llm · http</span></div>
+      <div class="stage"><span class="k">03</span><h3>Grader</h3><span class="mono">canary · regex · tools · refusal</span></div>
+      <div class="stage"><span class="k">04</span><h3>Report</h3><span class="mono">grade · OWASP · pdf · csv</span></div>
     </div>
 
     <h2>Attack catalog</h2>
@@ -220,12 +213,12 @@ async function renderHome() {
 
     <h2>Safety model</h2>
     <div class="card safety">
-      <div><h3>Fake secrets only</h3><p>Agents hold planted <span class="code">CANARY-…</span> values and dummy keys. Nothing real can leak.</p></div>
-      <div><h3>Offline by default</h3><p>The demo bots are scripted and the real-LLM agents run on a local model, so transcripts stay on the machine.</p></div>
-      <div><h3>Authorization gate</h3><p>A URL target is scanned only after you confirm you own it or may test it. External hosts must be allow-listed.</p></div>
-      <div><h3>Hard guardrail</h3><p>Government, military, education and intergovernmental domains (.gov .mil .edu .int, gov.in…) are refused, always.</p></div>
-      <div><h3>Public demo mode</h3><p>The hosted version tests only the built-in agents: no URLs, fixed suite and output folder, capped scans.</p></div>
-      <div><h3>Safe rendering</h3><p>Agent replies are untrusted input and are escaped before display. Run ids are validated before any file read.</p></div>
+      <div><h3>Fake secrets only</h3><p>Canary values and dummy keys. Nothing real can leak.</p></div>
+      <div><h3>Local by default</h3><p>Scripted bots and a local model. Transcripts stay on the machine.</p></div>
+      <div><h3>Authorization gate</h3><p>URL targets need your confirmation and an allow-listed host.</p></div>
+      <div><h3>Hard guardrail</h3><p>.gov .mil .edu .int and gov.in-style domains are always refused.</p></div>
+      <div><h3>Public demo mode</h3><p>Built-in agents only, capped scans.</p></div>
+      <div><h3>Safe rendering</h3><p>Replies are escaped, run ids validated.</p></div>
     </div>
 
     <h2>Run it yourself</h2>
@@ -233,8 +226,7 @@ async function renderHome() {
       <pre>git clone https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
 cd Agent-Red-Teaming-Evaluation-Framework
 pip install -e .
-python app.py            <span class="dim"># then open http://127.0.0.1:8000</span></pre>
-      <p class="muted" style="margin-top:10px;font-size:13px">CLI: <span class="code">agent-redteam run --suite core --target mock:weak</span> · REST API docs at <a href="/docs" style="color:var(--text)">/docs</a></p>
+python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
     </div></div>
 
     <h2>Recent scans</h2>
@@ -248,11 +240,11 @@ python app.py            <span class="dim"># then open http://127.0.0.1:8000</sp
     const st = e.targets["llm:strong"];
     const el = document.getElementById("headline");
     el.innerHTML = `
-      <div><span class="mono dim">measured on a real model · ${esc(e.model)} · ${esc(e.repeats)} runs each</span>
-        <h3 style="margin-top:4px">Hardening the system prompt cut attack success from ${pct(w.mean_asr)} to ${pct(st.mean_asr)}</h3></div>
+      <div><span class="mono dim">real model · ${esc(e.model)} · ${esc(e.repeats)} runs</span>
+        <h3 style="margin-top:4px">Hardened prompt: ${pct(w.mean_asr)} → ${pct(st.mean_asr)} attack success</h3></div>
       <div class="hl-nums"><span><b class="num hit-t">${pct(w.mean_asr)}</b><small>no guardrails</small></span>
-        <span><b class="num ok-t">${pct(st.mean_asr)}</b><small>hardened prompt</small></span>
-        <span class="mono dim">view results →</span></div>`;
+        <span><b class="num ok-t">${pct(st.mean_asr)}</b><small>hardened</small></span>
+        <span class="mono dim">→</span></div>`;
     el.style.display = "flex";
   }).catch(() => {});
 
@@ -304,7 +296,7 @@ function renderScan() {
   nav("scan");
   view.innerHTML = `
     <div class="ph"><div><div class="crumb">scans / new</div><h1>New scan</h1>
-      <p class="lede">Choose the agent and which attack categories to run against it.</p></div></div>
+      <p class="lede">Pick an agent and the attacks to run.</p></div></div>
     <div class="setup">
       <div style="display:grid;gap:16px">
         <div class="card">
@@ -416,7 +408,7 @@ function renderRun(runId) {
       <h1 id="run-title">Starting scan…</h1></div></div>
     <div class="run-grid">
       <div class="card">
-        <div class="card-h"><h3>Run log</h3><span class="mono dim">click a row for the evidence</span></div>
+        <div class="card-h"><h3>Run log</h3><span class="mono dim">click a row for evidence</span></div>
         <div id="log"><div class="empty">Waiting for the first result…</div></div>
       </div>
       <div class="card sticky">
@@ -604,12 +596,12 @@ async function renderCompare(query) {
     return;
   }
   const head = `<div class="ph"><div><div class="crumb">scans / compare</div><h1>Compare scans</h1>
-    <p class="lede">Diff two scans: unprotected vs protected, or the same agent before and after a fix.</p></div></div>`;
+    <p class="lede">Unprotected vs protected, or before vs after a fix.</p></div></div>`;
 
   if (runs.length < 2) {
     view.innerHTML = `${head}
       <div class="card"><div class="card-b" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
-        <p class="muted">Two finished scans are needed. Run both demo bots to get a baseline.</p>
+        <p class="muted">Needs two finished scans.</p>
         <button class="btn" id="both">Scan both demo bots</button>
       </div><div id="both-status"></div></div>`;
     document.getElementById("both").addEventListener("click", async (ev) => {
@@ -707,8 +699,7 @@ async function renderResults() {
   nav("results");
   view.innerHTML = `
     <div class="ph"><div><div class="crumb">results</div><h1>Results on a real model</h1>
-      <p class="lede">The core suite run repeatedly against a local LLM, once with a minimal system prompt and once
-        with a hardened one. Repeats show how much a model's behaviour varies between runs.</p></div></div>
+      <p class="lede">The core suite against a local LLM, with and without a hardened prompt.</p></div></div>
     <div id="exp"><div class="empty">Loading…</div></div>`;
   let exps;
   try {
@@ -770,11 +761,10 @@ function renderPlayground() {
   nav("playground");
   view.innerHTML = `
     <div class="ph"><div><div class="crumb">playground</div><h1>Playground</h1>
-      <p class="lede">Send a single message to an agent and see how the grader judges the reply.
-        Messages are independent; there is no conversation memory.</p></div></div>
+      <p class="lede">Send one message, see the reply and the verdict.</p></div></div>
     <div class="pg">
       <div class="card">
-        <div class="card-h"><h3>Presets</h3><span class="mono dim">click to load</span></div>
+        <div class="card-h"><h3>Presets</h3></div>
         ${PRESETS.map((p, i) => `<button class="preset" data-i="${i}">
           ${esc(p.label)}<span class="tag">${code(p.category)}</span><small>${esc(p.text)}</small></button>`).join("")}
       </div>
