@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>redteam · agent security console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111418'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23ff5a36' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%23ff5a36'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <a class="brand" href="#/">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 1v5M12 18v5M1 12h5M18 12h5" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+        </svg>
+        <span>redteam</span>
+      </a>
+
+      <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="#/" data-nav="home">
+          <svg viewBox="0 0 16 16"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"/></svg>Overview</a>
+        <a href="#/scan" data-nav="scan">
+          <svg viewBox="0 0 16 16"><path d="M3 2l10 6-10 6z"/></svg>New scan</a>
+        <a href="#/playground" data-nav="playground">
+          <svg viewBox="0 0 16 16"><path d="M2 3h12v8H6l-4 3z"/></svg>Playground</a>
+        <a href="#/compare" data-nav="compare">
+          <svg viewBox="0 0 16 16"><path d="M2 4h9M8 1l3 3-3 3M14 12H5M8 9l-3 3 3 3"/></svg>Compare</a>
+        <a href="#/results" data-nav="results">
+          <svg viewBox="0 0 16 16"><path d="M2 14V8M6 14V4M10 14V9M14 14V2"/></svg>Results</a>
+        <div class="nav-label">Reference</div>
+        <a href="/docs" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16"><path d="M5 4L1 8l4 4M11 4l4 4-4 4"/></svg>REST API</a>
+      </nav>
+
+      <div class="side-foot">
+        <div class="status"><span class="dot" id="api-dot"></span><span id="api-status">connecting</span></div>
+        <div class="mono dim" id="version"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page" id="view"></div>
+      <footer class="foot">Test only agents you own or are authorized to test.</footer>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

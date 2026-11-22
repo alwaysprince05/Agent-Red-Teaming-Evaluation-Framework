@@ -32,6 +32,7 @@ Pydantic models. Think of these as blueprints for the data:
 
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 import uuid
@@ -216,6 +217,7 @@ class Finding(BaseModel):
     reproduction: str
     remediation: str
     evidence: list[Evidence] = Field(default_factory=list)
+    owasp: list[str] = Field(default_factory=list)  # OWASP LLM Top 10 ids, primary first
 
 
 class SuiteMetrics(BaseModel):
@@ -237,6 +239,8 @@ class RunSummary(BaseModel):
     target: str
     metrics: SuiteMetrics
     findings: list[Finding] = Field(default_factory=list)
+    framework_version: str = ""
+    suite_sha256: str = ""  # hash of the suite file, so a report names the exact cases it ran
 
 
 class RegressionItem(BaseModel):
@@ -261,3 +265,8 @@ def new_run_id() -> str:
 
 def new_finding_id() -> str:
     return "F-" + uuid.uuid4().hex[:10]
+
+
+def stable_finding_id(target: str, test_id: str) -> str:
+    """Same target and case give the same id on every run, so findings can be tracked."""
+    return "F-" + hashlib.sha256(f"{target}|{test_id}".encode()).hexdigest()[:10]

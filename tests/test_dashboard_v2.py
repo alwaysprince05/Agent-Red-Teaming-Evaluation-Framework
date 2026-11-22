@@ -97,7 +97,7 @@ def test_findings_show_agent_reply(mixed_runs):
     text = html_of(mixed_runs)
     findings = text.split("<h2>Findings (newest first)</h2>")[1]
     assert "Agent reply" in findings
-    assert "ignoring my previous instructions" in findings  # mock:weak's actual reply
+    assert "My system prompt says" in findings  # mock:weak's actual reply
 
 
 def test_hostile_reply_is_escaped(tmp_path, suite_path):
