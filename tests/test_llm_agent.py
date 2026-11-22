@@ -259,3 +259,23 @@ class TestTargetAuthorization:
         assert LLMTargetConfig.from_env().model == "judge-model"
         monkeypatch.setenv("AGENT_REDTEAM_TARGET_MODEL", "target-model")
         assert LLMTargetConfig.from_env().model == "target-model"
+
+
+def test_last_reply_and_tool_calls_cover_only_the_final_turn(monkeypatch):
+    from agent_redteam.adapters.llm_agent import LLMAgent, LLMTargetConfig
+    from agent_redteam.core.schemas import ToolCall, Turn
+
+    agent = LLMAgent(profile="weak", config=LLMTargetConfig(base_url="http://127.0.0.1:9/v1", model="m"))
+
+    def fake_turn(messages, calls):
+        question = messages[-1]["content"]
+        if question == "first":
+            calls.append(ToolCall(name="read_file", arguments={"path": "a"}))
+        return f"answer to {question}"
+
+    monkeypatch.setattr(agent, "_agent_turn", fake_turn)
+    r = agent.send([Turn(content="first"), Turn(content="second")])
+    assert r.text == "answer to first\n\nanswer to second"
+    assert r.last_reply == "answer to second"
+    assert r.last_tool_calls == []
+    assert len(r.tool_calls) == 1

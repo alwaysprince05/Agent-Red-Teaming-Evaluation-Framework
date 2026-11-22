@@ -238,10 +238,12 @@ class LLMAgent(AgentAdapter):
         messages: list[dict[str, Any]] = [{"role": "system", "content": self.system_prompt}]
         calls: list[ToolCall] = []
         replies: list[str] = []
+        last_call_index = 0
         try:
             for turn in turns:
                 if turn.role == "user":
                     messages.append({"role": "user", "content": turn.content})
+                    last_call_index = len(calls)
                     reply = self._agent_turn(messages, calls)
                     replies.append(reply)
                     messages.append({"role": "assistant", "content": reply})
@@ -262,6 +264,8 @@ class LLMAgent(AgentAdapter):
             text="\n\n".join(replies),
             tool_calls=calls,
             latency_ms=round((time.monotonic() - start) * 1000, 3),
+            last_reply=replies[-1] if replies else None,
+            last_tool_calls=calls[last_call_index:],
         )
 
 
