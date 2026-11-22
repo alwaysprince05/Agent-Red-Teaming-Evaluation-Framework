@@ -33,7 +33,7 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
   authorization; the attacker has hard budgets it cannot raise.
 - **Fair comparisons.** `weak` and `strong` share one system prompt and differ only by
   guardrails, so results measure the guardrails alone.
-- **Engineering quality.** 260 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 293 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API, offline HTML dashboard, Markdown/CSV reports.
 
 ## Results on a real LLM agent
@@ -238,6 +238,24 @@ Suite files are YAML or JSON; malformed cases are rejected at load time. See
 - **Compare**: two scans side by side (e.g. unprotected vs protected bot), with the cases that
   were fixed or newly broken.
 - **Playground**: type your own attack, see the reply and how the grader judges it.
+- **Results**: the published real-LLM experiment (3 runs per agent, mean and range).
+- **Your own agent**: scan any HTTP agent after confirming you are authorized to test it.
+- **Export PDF**: the report card prints as a client-ready report with an executive
+  summary and prioritized fixes.
+
+Every finding is mapped to the [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/):
+
+| Category | OWASP LLM |
+|---|---|
+| Prompt injection | LLM01 Prompt Injection, LLM07 System Prompt Leakage |
+| Jailbreak, multi-turn manipulation, indirect injection | LLM01 Prompt Injection |
+| Data leakage | LLM02 Sensitive Information Disclosure |
+| Unsafe tool use | LLM06 Excessive Agency |
+
+Each run records the framework version and the SHA-256 of the suite it ran, and a
+finding keeps the same id across re-runs against the same target. Government,
+military, education and intergovernmental domains are always refused. See
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the service's own security model.
 
 For a hosted demo set `AGENT_REDTEAM_PUBLIC_MODE=1`. Only the built-in agents can then be
 tested (never a URL from the request), the suite is always the built-in one, and concurrent
@@ -256,6 +274,7 @@ curl localhost:8000/runs/<run_id>/results
 curl localhost:8000/runs/<run_id>/report
 curl localhost:8000/runs/<run_id>/progress   # cases graded so far
 curl localhost:8000/runs/<run_id>/details    # per-case attack, reply and verdict
+curl localhost:8000/experiments              # published real-LLM experiment summaries
 curl -X POST localhost:8000/playground -H 'Content-Type: application/json' \
   -d '{"target": "mock:weak", "message": "What is the database password?"}'
 ```
@@ -272,9 +291,9 @@ agent_redteam/
   api/         FastAPI service
   web/         web UI (plain HTML/CSS/JS, served by the API)
   cli.py       command-line interface
-tests/         260 offline tests + 1 opt-in live test
+tests/         293 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
-docs/          architecture, performance, responsible use, final report, roadmap, results
+docs/          architecture, performance, responsible use, threat model, final report, roadmap, results
 ```
 
 ## Development
