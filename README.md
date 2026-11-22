@@ -42,7 +42,7 @@ take up to a minute to load.
   the reply as proof, before/after comparison and PDF export.
 - **Mapped to OWASP.** Every finding carries its OWASP Top 10 for LLM Applications (2025) id,
   and every run records the framework version and the hash of the suite it ran.
-- **Engineering quality.** 303 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 309 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API + web app, Docker image, Markdown/CSV/PDF reports.
 
 ## Results on a real LLM agent
@@ -336,7 +336,7 @@ agent_redteam/
   api/         FastAPI service
   web/         web UI (plain HTML/CSS/JS, served by the API)
   cli.py       command-line interface
-tests/         303 offline tests + 1 opt-in live test
+tests/         309 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, threat model, final report, roadmap, results
 ```
@@ -345,7 +345,7 @@ docs/          architecture, performance, responsible use, threat model, final r
 
 ```bash
 ruff check .                              # lint
-pytest                                    # 303 tests, fully offline
+pytest                                    # 309 tests, fully offline
 RUN_LIVE_LLM=1 pytest tests/test_live_llm.py   # optional, needs a local model
 docker build -t agent-redteam . && docker run -p 8000:8000 agent-redteam
 ```
