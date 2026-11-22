@@ -5,7 +5,7 @@ and serves the web UI that sits on top of it.
 
 Endpoints:
   POST /runs                       start a run in a background thread, returns a run_id
-  GET  /runs                       recent runs started on this server
+  GET  /runs                       recent runs (in memory, plus finished runs saved under runs/)
   GET  /runs/{run_id}              status: "running", "completed" or "failed"
   GET  /runs/{run_id}/progress     cases graded so far (the UI polls this for live progress)
   GET  /runs/{run_id}/details      per-case rows (attack, reply, verdict) read from the artifacts
@@ -307,10 +307,39 @@ def start_run(req: RunRequest) -> RunCreated:
     return RunCreated(run_id=run_id, status="running", poll_url=f"/runs/{run_id}")
 
 
+def _runs_on_disk(base: Path, skip: set[str], limit: int) -> list[dict]:
+    """Finished runs saved under runs/, so the list survives a server restart."""
+    if not base.is_dir():
+        return []
+    out: list[dict] = []
+    names = sorted((p.name for p in base.iterdir() if _RUN_ID_RE.match(p.name)), reverse=True)
+    for name in names:
+        if len(out) >= limit:
+            break
+        path = base / name / "summary.json"
+        if name in skip or not path.is_file():
+            continue
+        try:
+            summary = RunSummary.model_validate_json(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        out.append({
+            "run_id": name,
+            "status": "completed",
+            "started_at": summary.created_at,
+            "target": summary.target,
+            "output_dir": str(base),
+            "metrics": summary.metrics.model_dump(),
+            "findings_count": len(summary.findings),
+        })
+    return out
+
+
 @app.get("/runs")
 def list_runs() -> list[dict]:
     with _LOCK:
         items = [{"run_id": rid, **entry} for rid, entry in _RUNS.items()]
+    items += _runs_on_disk(Path("runs"), {i["run_id"] for i in items}, 50)
     items.sort(key=lambda e: e["started_at"], reverse=True)
     return items[:50]
 

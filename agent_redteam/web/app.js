@@ -757,6 +757,45 @@ async function renderResults() {
 
 // ---------- playground ----------
 
+// The transcript, draft and chosen agent survive a page refresh. Stored only in
+// this browser; any storage error (private window, blocked site data) is ignored.
+const PG_KEY = "redteam.playground.v1";
+const PG_MAX_TURNS = 25;
+
+function pgLoad() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PG_KEY) || "null");
+    return v && Array.isArray(v.turns) ? v : { turns: [] };
+  } catch {
+    return { turns: [] };
+  }
+}
+
+function pgSave(state) {
+  try {
+    localStorage.setItem(PG_KEY, JSON.stringify({ ...state, turns: state.turns.slice(0, PG_MAX_TURNS) }));
+  } catch { /* storage unavailable */ }
+}
+
+function turnHtml(t) {
+  const r = t.result;
+  const state = r.status === "error" ? "" : r.violated ? "hit" : "ok";
+  const pill = r.status === "error" ? verdict(r) : r.violated ? '<span class="pill hit">unsafe</span>' : '<span class="pill ok">safe</span>';
+  return `
+    <div class="turn">
+      <div class="meta"><span>${esc(tname(t.target))} · ${esc(t.time)}</span>${pill}</div>
+      <div class="you"><span class="dim">user ›</span> ${esc(t.text)}</div>
+      <pre>${highlight(r.reply || "(empty reply)", r.evidence)}</pre>
+      ${toolsHtml(r.tool_calls)}
+      <div class="judge ${state}">
+        ${r.violated ? (r.evidence || []).map((e) => `<span>${esc(e)}</span>`).join("")
+          : r.status === "error" ? `<span>${esc(r.rationale)}</span>`
+          : "<span>no secret disclosed · no forbidden tool call</span>"}
+      </div>
+      ${r.violated ? `<div class="fix">${esc(r.remediation)}</div>` : ""}
+    </div>`;
+}
+
 function renderPlayground() {
   nav("playground");
   view.innerHTML = `
@@ -783,46 +822,48 @@ function renderPlayground() {
       </div>
     </div>`;
 
-  let category = "prompt_injection";
+  const EMPTY = '<div class="empty">Nothing sent yet. Pick a preset or write your own.</div>';
+  const saved = pgLoad();
+  let category = saved.category || "prompt_injection";
   const msg = document.getElementById("msg");
   const turns = document.getElementById("turns");
+  const targetSel = document.getElementById("target");
+  if (saved.target && config.targets.includes(saved.target)) targetSel.value = saved.target;
+  if (saved.draft) msg.value = saved.draft;
+  const history = saved.turns.filter((t) => t && t.result && typeof t.text === "string");
+  turns.innerHTML = history.length ? history.map(turnHtml).join("") : EMPTY;
+  const persist = () => pgSave({ turns: history, draft: msg.value, target: targetSel.value, category });
+  targetSel.addEventListener("change", persist);
   view.querySelectorAll(".preset").forEach((b) => b.addEventListener("click", () => {
     const p = PRESETS[Number(b.dataset.i)];
     msg.value = p.text;
     category = p.category;
+    persist();
     msg.focus();
   }));
-  msg.addEventListener("input", () => { category = "prompt_injection"; });
+  msg.addEventListener("input", () => { category = "prompt_injection"; persist(); });
   document.getElementById("clear").onclick = () => {
-    turns.innerHTML = '<div class="empty">Nothing sent yet. Pick a preset or write your own.</div>';
+    history.length = 0;
+    turns.innerHTML = EMPTY;
+    persist();
   };
 
   const send = async () => {
     const text = msg.value.trim();
     if (!text) return;
-    const target = document.getElementById("target").value;
+    const target = targetSel.value;
     const btn = document.getElementById("send");
     document.getElementById("pg-err").innerHTML = "";
     btn.disabled = true;
     try {
       const r = await api("/playground", { method: "POST", body: JSON.stringify({ target, message: text, category }) });
       if (turns.querySelector(".empty")) turns.innerHTML = "";
-      const state = r.status === "error" ? "" : r.violated ? "hit" : "ok";
-      turns.insertAdjacentHTML("afterbegin", `
-        <div class="turn">
-          <div class="meta"><span>${esc(tname(target))} · ${esc(new Date().toLocaleTimeString())}</span>${
-            r.status === "error" ? verdict(r) : r.violated ? '<span class="pill hit">unsafe</span>' : '<span class="pill ok">safe</span>'}</div>
-          <div class="you"><span class="dim">user ›</span> ${esc(text)}</div>
-          <pre>${highlight(r.reply || "(empty reply)", r.evidence)}</pre>
-          ${toolsHtml(r.tool_calls)}
-          <div class="judge ${state}">
-            ${r.violated ? r.evidence.map((e) => `<span>${esc(e)}</span>`).join("")
-              : r.status === "error" ? `<span>${esc(r.rationale)}</span>`
-              : "<span>no secret disclosed · no forbidden tool call</span>"}
-          </div>
-          ${r.violated ? `<div class="fix">${esc(r.remediation)}</div>` : ""}
-        </div>`);
+      const entry = { target, text, time: new Date().toLocaleTimeString(), result: r };
+      history.unshift(entry);
+      history.length = Math.min(history.length, PG_MAX_TURNS);
+      turns.insertAdjacentHTML("afterbegin", turnHtml(entry));
       msg.value = "";
+      persist();
     } catch (e) {
       document.getElementById("pg-err").innerHTML = `<div class="err" style="margin:0">${esc(e.message)}</div>`;
     } finally {

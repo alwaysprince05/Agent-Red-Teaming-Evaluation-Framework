@@ -119,6 +119,23 @@ class TestProgressAndDetails:
         _wait(run_id)
         assert run_id in [r["run_id"] for r in client.get("/runs").json()]
 
+    def test_finished_runs_on_disk_are_listed(self, tmp_path, monkeypatch):
+        # A run that is not in server memory (e.g. after a restart) still shows up.
+        monkeypatch.chdir(tmp_path)
+        rid = "20260101-000000-abcdef12"
+        execute_run(
+            BUILTIN_SUITE_PATH, MockAgent("weak"),
+            RunOptions(rate_limit_s=0, output_dir=tmp_path / "runs"), run_id=rid,
+        )
+        (tmp_path / "runs" / "not-a-run").mkdir()
+        listed = {r["run_id"]: r for r in client.get("/runs").json()}
+        assert rid in listed
+        assert listed[rid]["status"] == "completed"
+        assert listed[rid]["target"] == "mock:weak"
+        assert listed[rid]["metrics"]["violations"] > 0
+        assert "not-a-run" not in listed
+        assert client.get(f"/runs/{rid}/details").json()["run_id"] == rid
+
     def test_downloads(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         run_id = _start(tmp_path)
