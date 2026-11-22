@@ -14,13 +14,13 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
 > **Responsible use:** only test agents you own or have written permission to test. External
 > targets are refused unless explicitly authorized. See [docs/RESPONSIBLE_USE.md](docs/RESPONSIBLE_USE.md).
 
-![Dashboard comparing the weak and strong agents](docs/images/dashboard.png)
+![Web app overview: the same attack against an unprotected and a protected agent](docs/images/web-overview.png)
 
 **Contents:** [Highlights](#highlights) · [Results](#results-on-a-real-llm-agent) ·
 [Project status](#project-status) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
-[CLI](#cli-reference) · [Dashboard](#dashboard) · [Targets](#targets) · [Safety](#safety-model) ·
-[Grading](#grading) · [REST API](#rest-api) · [Development](#development) ·
-[Limitations](#limitations)
+[Web app](#web-app) · [CLI](#cli-reference) · [Dashboard](#dashboard) · [Targets](#targets) ·
+[Safety](#safety-model) · [Grading](#grading) · [REST API](#rest-api) · [Deploy](#deploy) ·
+[Development](#development) · [Limitations](#limitations)
 
 ## Highlights
 
@@ -33,8 +33,12 @@ OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **A
   authorization; the attacker has hard budgets it cannot raise.
 - **Fair comparisons.** `weak` and `strong` share one system prompt and differ only by
   guardrails, so results measure the guardrails alone.
-- **Engineering quality.** 293 offline tests (no model or API key needed), CI on Python
-  3.11–3.13, CLI + REST API, offline HTML dashboard, Markdown/CSV reports.
+- **A web app, not just a CLI.** Live scans, a playground for your own attacks, reports with
+  the reply as proof, before/after comparison and PDF export.
+- **Mapped to OWASP.** Every finding carries its OWASP Top 10 for LLM Applications (2025) id,
+  and every run records the framework version and the hash of the suite it ran.
+- **Engineering quality.** 299 offline tests (no model or API key needed), CI on Python
+  3.11–3.13, CLI + REST API + web app, Docker image, Markdown/CSV/PDF reports.
 
 ## Results on a real LLM agent
 
