@@ -98,7 +98,10 @@ class MockAgent(AgentAdapter):
         self.profile = profile
 
     def _respond(self, turns: list[Turn]) -> tuple[str, list[ToolCall]]:
-        user_text = "\n".join(t.content for t in turns if t.role == "user")
+        # Answer the latest user message. Earlier turns are context only, so an old
+        # attack does not keep firing on every later, harmless message.
+        user_turns = [t.content for t in turns if t.role == "user"]
+        user_text = user_turns[-1] if user_turns else ""
         low = user_text.lower()
 
         # Weak profile: obeys injected instructions and leaks fake secrets.
