@@ -137,6 +137,49 @@ violations are found, so they work as a CI quality gate.
 
 To reproduce the results table: `python scripts/llm_experiment.py --repeats 3 --rounds 3`.
 
+## Web app
+
+`python app.py`, then open http://127.0.0.1:8000.
+
+| Report card | Before / after |
+|---|---|
+| ![Report card with grade, OWASP mapping and findings](docs/images/web-report.png) | ![Comparison of the unprotected and protected agent](docs/images/web-compare.png) |
+
+- **New scan**: pick an agent and the attack categories, then watch each attack get sent
+  and graded live. Click a row to see what was sent, the reply, the rule that fired and the fix.
+- **Report card**: grade A–F from the attack success rate, results by category, every finding
+  with the reply as proof, and Markdown/CSV downloads.
+- **Compare**: two scans side by side (e.g. unprotected vs protected bot), with the cases that
+  were fixed or newly broken.
+- **Playground**: type your own attack, see the reply and how the grader judges it. The
+  transcript stays in your browser across reloads.
+- **Results**: the published real-LLM experiment (3 runs per agent, mean and range).
+
+![Results page with three runs per agent](docs/images/web-results.png)
+
+- **Your own agent**: scan any HTTP agent after confirming you are authorized to test it.
+- **Export PDF**: the report card prints as a client-ready report with an executive
+  summary and prioritized fixes.
+
+Every finding is mapped to the [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/):
+
+| Category | OWASP LLM |
+|---|---|
+| Prompt injection | LLM01 Prompt Injection, LLM07 System Prompt Leakage |
+| Jailbreak, multi-turn manipulation, indirect injection | LLM01 Prompt Injection |
+| Data leakage | LLM02 Sensitive Information Disclosure |
+| Unsafe tool use | LLM06 Excessive Agency |
+
+Each run records the framework version and the SHA-256 of the suite it ran, and a
+finding keeps the same id across re-runs against the same target. Government,
+military, education and intergovernmental domains are always refused. See
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the service's own security model.
+
+For a hosted demo set `AGENT_REDTEAM_PUBLIC_MODE=1`. Only the built-in agents can then be
+tested (never a URL from the request), the suite is always the built-in one, and concurrent
+scans and playground messages are capped. `llm:*` agents appear only when the operator sets
+`AGENT_REDTEAM_TARGET_BASE_URL` (or `AGENT_REDTEAM_LLM_BASE_URL`).
+
 ## CLI reference
 
 | Command | What it does |
@@ -153,6 +196,8 @@ To reproduce the results table: `python scripts/llm_experiment.py --repeats 3 --
 Run `agent-redteam <command> --help` for every option.
 
 ## Dashboard
+
+![Offline dashboard comparing the weak and strong agents](docs/images/dashboard.png)
 
 `agent-redteam dashboard` writes one self-contained HTML file: no JavaScript, no network
 requests, light and dark mode. It shows:
@@ -230,41 +275,6 @@ grading add `--use-llm-judge` (temperature 0; a judge failure is an error, never
 Suite files are YAML or JSON; malformed cases are rejected at load time. See
 [attacks_example/custom_suite.yaml](attacks_example/custom_suite.yaml) and the built-in
 [core suite](agent_redteam/attacks/core_suite.yaml).
-
-## Web UI
-
-`python app.py`, then open http://127.0.0.1:8000.
-
-- **New scan**: pick an agent and the attack categories, then watch each attack get sent
-  and graded live. Click a row to see what was sent, the reply, the rule that fired and the fix.
-- **Report card**: grade A–F from the attack success rate, results by category, every finding
-  with the reply as proof, and Markdown/CSV downloads.
-- **Compare**: two scans side by side (e.g. unprotected vs protected bot), with the cases that
-  were fixed or newly broken.
-- **Playground**: type your own attack, see the reply and how the grader judges it.
-- **Results**: the published real-LLM experiment (3 runs per agent, mean and range).
-- **Your own agent**: scan any HTTP agent after confirming you are authorized to test it.
-- **Export PDF**: the report card prints as a client-ready report with an executive
-  summary and prioritized fixes.
-
-Every finding is mapped to the [OWASP Top 10 for LLM Applications (2025)](https://genai.owasp.org/llm-top-10/):
-
-| Category | OWASP LLM |
-|---|---|
-| Prompt injection | LLM01 Prompt Injection, LLM07 System Prompt Leakage |
-| Jailbreak, multi-turn manipulation, indirect injection | LLM01 Prompt Injection |
-| Data leakage | LLM02 Sensitive Information Disclosure |
-| Unsafe tool use | LLM06 Excessive Agency |
-
-Each run records the framework version and the SHA-256 of the suite it ran, and a
-finding keeps the same id across re-runs against the same target. Government,
-military, education and intergovernmental domains are always refused. See
-[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the service's own security model.
-
-For a hosted demo set `AGENT_REDTEAM_PUBLIC_MODE=1`. Only the built-in agents can then be
-tested (never a URL from the request), the suite is always the built-in one, and concurrent
-scans and playground messages are capped. `llm:*` agents appear only when the operator sets
-`AGENT_REDTEAM_TARGET_BASE_URL` (or `AGENT_REDTEAM_LLM_BASE_URL`).
 
 ## REST API
 
