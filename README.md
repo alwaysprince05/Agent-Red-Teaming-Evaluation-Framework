@@ -74,6 +74,7 @@ Measured against the project PRD (full mapping with evidence in
 | Must-have features (PRD §2.1) | **10 / 10** implemented and tested |
 | Stretch goals (PRD §2.2) | **5 / 8**: attack generation, indirect injection, tool-use safety, dashboard, CI gate |
 | Attack categories (PRD §4.2) | **6 / 10**: prompt injection, jailbreak, data leakage, unsafe tool use, multi-turn, indirect injection |
+| Added beyond the PRD | Web app (live scans, playground, compare, PDF report), OWASP LLM Top 10 mapping, run provenance, protected-domain guardrail, threat model |
 | Not implemented | Memory, goal-manipulation, hallucination and availability attacks; reviewer override of verdicts; concurrent execution; token-cost tracking; plugin system; public dataset adapters; object-store backend |
 
 ## How it works
@@ -245,7 +246,11 @@ POST /agent  {"messages": [{"role": "user", "content": "..."}]}
   and cannot author grading policies. Its output is validated, with the rule-based planner as
   fallback.
 - **Untrusted replies:** target replies shown to the planner are truncated and fenced as data;
-  replies in the dashboard are HTML-escaped.
+  replies in the dashboard and the web app are HTML-escaped.
+- **Protected domains:** government, military, education and intergovernmental hosts
+  (`.gov`, `.mil`, `.edu`, `.int`, `gov.in`, `ac.in`…) are refused whatever the flags say.
+- **Explicit consent in the web app:** scanning your own agent needs a confirmation that you
+  own it or may test it; the hosted demo mode allows the built-in agents only.
 - **Failures never pass:** timeouts, transport errors and judge failures are recorded as errors.
 
 ## Grading
@@ -293,6 +298,23 @@ curl -X POST localhost:8000/playground -H 'Content-Type: application/json' \
   -d '{"target": "mock:weak", "message": "What is the database password?"}'
 ```
 
+## Deploy
+
+The Docker image serves the web app and the API. It runs as a non-root user and listens on
+`$PORT` (default 8000).
+
+```bash
+docker build -t agent-redteam .
+docker run -p 8000:8000 -e AGENT_REDTEAM_PUBLIC_MODE=1 agent-redteam
+```
+
+On Render: **New → Web Service**, connect this repository, choose the **Docker** runtime and add
+the environment variable `AGENT_REDTEAM_PUBLIC_MODE=1`. No start command is needed. To offer the
+real-LLM agents as well, set `AGENT_REDTEAM_TARGET_BASE_URL`, `_MODEL` and `_API_KEY` to an
+OpenAI-compatible endpoint you are allowed to use; keys stay in the platform's settings, never
+in the repository. Free instances sleep when idle and start with an empty `runs/` after a
+restart; the published results under `docs/results/` are part of the image.
+
 ## Project layout
 
 ```
@@ -305,7 +327,7 @@ agent_redteam/
   api/         FastAPI service
   web/         web UI (plain HTML/CSS/JS, served by the API)
   cli.py       command-line interface
-tests/         293 offline tests + 1 opt-in live test
+tests/         299 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, threat model, final report, roadmap, results
 ```
@@ -314,7 +336,7 @@ docs/          architecture, performance, responsible use, threat model, final r
 
 ```bash
 ruff check .                              # lint
-pytest                                    # 228 tests, fully offline
+pytest                                    # 299 tests, fully offline
 RUN_LIVE_LLM=1 pytest tests/test_live_llm.py   # optional, needs a local model
 docker build -t agent-redteam . && docker run -p 8000:8000 agent-redteam
 ```
@@ -332,13 +354,15 @@ CI runs lint, tests and a wheel build on Python 3.11, 3.12 and 3.13. Tests clear
 - Multi-turn cases are fixed sequences; memory and cross-session attacks are not covered yet.
 - The suite covers 6 of the 10 attack categories in the PRD; see [Project status](#project-status).
 - Cases run one at a time under the rate limit; there is no concurrent execution or token-cost tracking.
-- The REST API keeps its run registry in memory; `runs/` is the durable store.
+- Live progress is kept in memory; finished runs are read back from `runs/`, which is the
+  durable store. On a free hosting tier that folder is wiped on restart.
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — components, pipeline and design decisions
 - [Final report](docs/FINAL_REPORT.md) — PRD deliverables with evidence, v2 changes and what is not implemented
 - [Responsible use](docs/RESPONSIBLE_USE.md) — authorization rules and safety boundaries
+- [Threat model](docs/THREAT_MODEL.md) — STRIDE analysis of the API and web app
 - [Performance](docs/PERFORMANCE.md) — benchmark methodology and measurements
 - [Roadmap](docs/ROADMAP.md) — shipped features and planned work
 - [Releases](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/releases) — change history
