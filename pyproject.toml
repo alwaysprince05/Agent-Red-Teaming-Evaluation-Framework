@@ -28,7 +28,7 @@ agent-redteam = "agent_redteam.cli:main"
 include = ["agent_redteam*"]
 
 [tool.setuptools.package-data]
-agent_redteam = ["attacks/*.yaml", "py.typed"]
+agent_redteam = ["attacks/*.yaml", "web/*", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
