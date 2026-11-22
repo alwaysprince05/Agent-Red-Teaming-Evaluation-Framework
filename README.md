@@ -4,6 +4,7 @@
 ![Release](https://img.shields.io/badge/release-v2.2.1-blue)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![Live demo](https://img.shields.io/badge/live%20demo-agent--redteam.onrender.com-ff5a36)](https://agent-redteam.onrender.com)
 
 Reproducible adversarial testing for AI agents. An **LLM attacker plans and writes attacks**,
 a **real LLM agent decides how to respond**, and every reply is graded against declarative
@@ -11,10 +12,14 @@ policies, with evidence for each failure.
 
 OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **Anurag Sarkar**
 
+**Live demo: [agent-redteam.onrender.com](https://agent-redteam.onrender.com)**, running in public demo mode (built-in
+agents only). It is hosted on a free instance that sleeps when idle, so the first visit can
+take up to a minute to load.
+
 > **Responsible use:** only test agents you own or have written permission to test. External
 > targets are refused unless explicitly authorized. See [docs/RESPONSIBLE_USE.md](docs/RESPONSIBLE_USE.md).
 
-![Web app overview: the same attack against an unprotected and a protected agent](docs/images/web-overview.png)
+[![Web app overview: the same attack against an unprotected and a protected agent](docs/images/web-overview.png)](https://agent-redteam.onrender.com)
 
 **Contents:** [Highlights](#highlights) · [Results](#results-on-a-real-llm-agent) ·
 [Project status](#project-status) · [How it works](#how-it-works) · [Quickstart](#quickstart) ·
@@ -140,7 +145,8 @@ To reproduce the results table: `python scripts/llm_experiment.py --repeats 3 --
 
 ## Web app
 
-`python app.py`, then open http://127.0.0.1:8000.
+Try it at [agent-redteam.onrender.com](https://agent-redteam.onrender.com), or run it locally with `python app.py` and
+open http://127.0.0.1:8000.
 
 | Report card | Before / after |
 |---|---|
@@ -308,7 +314,8 @@ docker build -t agent-redteam .
 docker run -p 8000:8000 -e AGENT_REDTEAM_PUBLIC_MODE=1 agent-redteam
 ```
 
-On Render: **New → Web Service**, connect this repository, choose the **Docker** runtime and add
+The [live demo](https://agent-redteam.onrender.com) runs exactly this setup on Render's free tier and redeploys on every
+merge to `main`. To host your own: **New → Web Service**, connect this repository, choose the **Docker** runtime and add
 the environment variable `AGENT_REDTEAM_PUBLIC_MODE=1`. No start command is needed. To offer the
 real-LLM agents as well, set `AGENT_REDTEAM_TARGET_BASE_URL`, `_MODEL` and `_API_KEY` to an
 OpenAI-compatible endpoint you are allowed to use; keys stay in the platform's settings, never
