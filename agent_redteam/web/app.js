@@ -31,6 +31,13 @@ const PRESETS = [
   { label: "Benign request", category: "prompt_injection", text: "Hi, what can you help me with?" },
 ];
 
+const ICONS = {
+  suite: '<svg viewBox="0 0 20 20"><path d="M4 3h9l3 3v11H4z"/><path d="M7 9h6M7 12h6M7 15h4"/></svg>',
+  agent: '<svg viewBox="0 0 20 20"><rect x="4" y="6" width="12" height="10" rx="2"/><path d="M10 3v3M7.5 11h.01M12.5 11h.01"/></svg>',
+  grader: '<svg viewBox="0 0 20 20"><path d="M10 2l6 3v5c0 4-3 6.5-6 8-3-1.5-6-4-6-8V5z"/><path d="M7 10l2 2 4-4"/></svg>',
+  report: '<svg viewBox="0 0 20 20"><path d="M4 17V9M8 17V5M12 17v-6M16 17V3"/></svg>',
+};
+
 const CHEV = '<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2l4 4-4 4"/></svg>';
 
 // ---------- helpers ----------
@@ -151,7 +158,7 @@ function detailHtml(row) {
     ${row.objective ? `<div class="kv"><span>Objective</span><p style="padding-top:8px">${esc(row.objective)}</p></div>` : ""}
     ${row.owasp && row.owasp.length ? `<div class="kv"><span>OWASP LLM</span><p style="padding-top:8px">${row.owasp.map((o) => `${owaspTags([o])} <span class="muted">${esc(o.name)}</span>`).join("&nbsp;&nbsp; ")}</p></div>` : ""}
     <div class="kv"><span>Sent</span><pre>${sent}</pre></div>
-    <div class="kv"><span>Reply</span><pre>${highlight(row.reply || "(empty reply)", row.evidence)}</pre></div>
+    <div class="kv"><span>Reply</span><pre class="prose">${highlight(row.reply || "(empty reply)", row.evidence)}</pre></div>
     ${row.tool_calls && row.tool_calls.length ? `<div class="kv"><span>Tool calls</span>${toolsHtml(row.tool_calls)}</div>` : ""}
     <div class="kv"><span>Grader</span>${row.evidence && row.evidence.length
       ? `<ul>${evidenceList(row.evidence).map((x) => `<li>${x}</li>`).join("")}</ul>`
@@ -187,44 +194,46 @@ async function renderHome() {
   const demo = PRESETS[1];
 
   view.innerHTML = `
-    <section class="intro">
-      <div>
-        <h1>Adversarial testing for AI agents.</h1>
-        <p class="lede">Attack an agent, grade every reply, see what got through with proof and a fix.</p>
+    <section class="hero">
+      <div class="hero-text">
+        <span class="eyebrow">Agent security testing</span>
+        <h1>Find out if your AI agent can be tricked.</h1>
+        <p class="lede">Run known attacks against an agent, grade every reply, and get a report with the proof and a fix for each problem.</p>
         <div class="actions">
-          <a class="btn" href="#/scan">New scan</a>
-          <a class="btn ghost" href="#/playground">Open playground</a>
+          <a class="btn" href="#/scan">Run a scan</a>
+          <a class="btn ghost" href="#/playground">Try an attack</a>
         </div>
         <div class="facts">
-          <div class="fact"><b class="num">${total}</b><span>attack cases</span></div>
-          <div class="fact"><b class="num">${config.categories.length}</b><span>categories</span></div>
-          <div class="fact"><b class="num" id="scan-count">–</b><span>scans run</span></div>
+          <span><b class="num">${total}</b> attacks</span>
+          <span><b class="num">${config.categories.length}</b> categories</span>
+          <span><b class="num" id="scan-count">–</b> scans run</span>
         </div>
       </div>
+      <a class="card result-panel" id="result-panel" href="#/results">
+        <div class="rp-head"><span>Measured on a real model</span><span class="dim" id="rp-model"></span></div>
+        <div id="rp-bars"><div class="empty">Loading…</div></div>
+        <div class="rp-foot">Attack success rate, mean of 3 runs <span class="arrow">See results →</span></div>
+      </a>
+    </section>
 
-      <div class="card">
-        <div class="card-h">
-          <h3>Same message, two agents</h3>
-          <span class="mono dim">live</span>
-        </div>
-        <div class="card-b" style="border-bottom:1px solid var(--line)">
-          <div class="prompt-line"><b>user</b>${esc(demo.text)}</div>
-        </div>
-        <div class="duel">
-          <div id="duel-weak"><div class="who"><span>${esc(tname("mock:weak"))}</span></div><div class="reply dim">…</div></div>
-          <div id="duel-strong"><div class="who"><span>${esc(tname("mock:strong"))}</span></div><div class="reply dim">…</div></div>
-        </div>
+    <section class="card demo">
+      <div class="card-h">
+        <h3>Same message, two agents</h3>
+        <span class="live"><i></i>live</span>
+      </div>
+      <div class="demo-prompt"><span class="who-tag">User</span>${esc(demo.text)}</div>
+      <div class="duel">
+        <div id="duel-weak"><div class="who"><span>${esc(tname("mock:weak"))}</span></div><div class="reply dim">…</div></div>
+        <div id="duel-strong"><div class="who"><span>${esc(tname("mock:strong"))}</span></div><div class="reply dim">…</div></div>
       </div>
     </section>
 
-    <a class="card headline" id="headline" href="#/results" style="display:none"></a>
-
-    <h2>Pipeline</h2>
+    <h2>How it works</h2>
     <div class="card flow">
-      <div class="stage"><span class="k">01</span><h3>Attack suite</h3><span class="mono">${total} cases · YAML</span></div>
-      <div class="stage"><span class="k">02</span><h3>Agent under test</h3><span class="mono">mock · llm · http</span></div>
-      <div class="stage"><span class="k">03</span><h3>Grader</h3><span class="mono">canary · regex · tools · refusal</span></div>
-      <div class="stage"><span class="k">04</span><h3>Report</h3><span class="mono">grade · OWASP · pdf · csv</span></div>
+      <div class="stage"><span class="ico ico-1">${ICONS.suite}</span><h3>Attack suite</h3><p>${total} versioned attacks, each with its own rules</p></div>
+      <div class="stage"><span class="ico ico-2">${ICONS.agent}</span><h3>Agent under test</h3><p>Demo bots, a local LLM or your own HTTP agent</p></div>
+      <div class="stage"><span class="ico ico-3">${ICONS.grader}</span><h3>Grader</h3><p>Catches leaked secrets, missing refusals and forbidden tool calls</p></div>
+      <div class="stage"><span class="ico ico-4">${ICONS.report}</span><h3>Report</h3><p>A grade, OWASP mapping, proof and fixes, as PDF or CSV</p></div>
     </div>
 
     <h2>Attack catalog</h2>
@@ -233,7 +242,7 @@ async function renderHome() {
         <tr><th style="width:70px">Code</th><th style="width:210px">Category</th><th>Technique</th><th style="width:130px">OWASP LLM</th><th style="width:60px;text-align:right">Cases</th></tr>
         ${config.categories.map((c) => `
           <tr>
-            <td><span class="tag">${code(c.id)}</span></td>
+            <td><span class="tag cat-${esc(c.id)}">${code(c.id)}</span></td>
             <td>${esc(c.label)}</td>
             <td class="muted">${esc(CATS[c.id] ? CATS[c.id].desc : "")}</td>
             <td>${owaspTags(c.owasp)}</td>
@@ -266,18 +275,22 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
 
   api("/experiments").then((exps) => {
     const e = exps[0];
-    if (!e || !e.targets["llm:weak"] || !e.targets["llm:strong"]) return;
-    const w = e.targets["llm:weak"];
-    const st = e.targets["llm:strong"];
-    const el = document.getElementById("headline");
-    el.innerHTML = `
-      <div><span class="mono dim">real model · ${esc(e.model)} · ${esc(e.repeats)} runs</span>
-        <h3 style="margin-top:4px">Hardened prompt: ${pct(w.mean_asr)} → ${pct(st.mean_asr)} attack success</h3></div>
-      <div class="hl-nums"><span><b class="num hit-t">${pct(w.mean_asr)}</b><small>no guardrails</small></span>
-        <span><b class="num ok-t">${pct(st.mean_asr)}</b><small>hardened</small></span>
-        <span class="mono dim">→</span></div>`;
-    el.style.display = "flex";
-  }).catch(() => {});
+    const bars = document.getElementById("rp-bars");
+    if (!e || !e.targets["llm:weak"] || !e.targets["llm:strong"]) {
+      bars.innerHTML = '<div class="empty">No published results yet.</div>';
+      return;
+    }
+    document.getElementById("rp-model").textContent = e.model;
+    const row = (label, v, cls) => `
+      <div class="rp-row">
+        <div class="rp-label"><span>${label}</span><b class="num ${cls}-t">${pct(v)}</b></div>
+        <div class="rp-track"><i class="${cls}" style="width:${Math.max(v * 100, 2)}%"></i></div>
+      </div>`;
+    bars.innerHTML = row("No guardrails", e.targets["llm:weak"].mean_asr, "hit")
+      + row("Hardened prompt", e.targets["llm:strong"].mean_asr, "ok");
+  }).catch(() => {
+    document.getElementById("rp-bars").innerHTML = '<div class="empty">Results unavailable.</div>';
+  });
 
   // Live demo: the same message to both demo bots, graded by the real API.
   for (const target of ["mock:weak", "mock:strong"]) {
@@ -287,7 +300,7 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
         box.innerHTML = `
           <div class="who"><span>${esc(tname(target))}</span>${r.violated ? '<span class="pill hit">breached</span>' : '<span class="pill ok">blocked</span>'}</div>
           <div class="reply">${highlight(r.reply, r.evidence)}</div>
-          <div class="why">${r.violated ? evidenceList(r.evidence).join(" · ") : "no secret disclosed · no tool called"}</div>`;
+          <div class="why ${r.violated ? "hit" : "ok"}">${r.violated ? evidenceList(r.evidence).join("") : "<span>No secret disclosed, no tool called</span>"}</div>`;
       })
       .catch((e) => { box.querySelector(".reply").textContent = e.message; });
   }
@@ -816,7 +829,7 @@ function turnHtml(t) {
     <div class="turn">
       <div class="meta"><span>${esc(tname(t.target))} · ${esc(t.time)}</span>${pill}</div>
       <div class="you"><span class="dim">user ›</span> ${esc(t.text)}</div>
-      <pre>${highlight(r.reply || "(empty reply)", r.evidence)}</pre>
+      <pre class="prose">${highlight(r.reply || "(empty reply)", r.evidence)}</pre>
       ${toolsHtml(r.tool_calls)}
       <div class="judge ${state}">
         ${r.violated ? evidenceList(r.evidence).join("")
