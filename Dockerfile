@@ -11,6 +11,9 @@ COPY agent_redteam ./agent_redteam
 
 RUN pip install --no-cache-dir .
 
+# Published experiment summaries for the web UI's Results page.
+COPY docs/results ./docs/results
+
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 

@@ -13,6 +13,7 @@ Endpoints:
   GET  /runs/{run_id}/report       generate the Markdown report and findings CSV
   GET  /runs/{run_id}/download/md  download the Markdown report (or /csv for the findings)
   POST /playground                 send one message to a built-in agent and grade the reply
+  GET  /experiments                published real-LLM experiment summaries
   GET  /config                     targets and categories the UI may offer
   GET  /healthz                    health check
   GET  /                           the web UI (the Swagger docs stay at /docs)
@@ -29,6 +30,7 @@ Public mode (AGENT_REDTEAM_PUBLIC_MODE=1) is meant for a hosted demo:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import threading
@@ -63,6 +65,7 @@ from agent_redteam.core.schemas import (
     Turn,
 )
 from agent_redteam.core.suite import SuiteError, load_suite
+from agent_redteam.core.taxonomy import owasp_entries
 from agent_redteam.evaluators.deterministic import evaluate_case
 from agent_redteam.reports.generate import generate_findings_csv, generate_markdown_report
 
@@ -114,6 +117,10 @@ class RunRequest(BaseModel):
     )
     categories: list[str] = Field(
         default_factory=list, description="Only run these attack categories (all when empty)"
+    )
+    authorized: bool = Field(
+        default=False,
+        description="Required for http(s) targets: you confirm you own or may test the agent",
     )
     allow_external_targets: bool = False
     allowed_hosts: list[str] = Field(default_factory=list)
@@ -184,6 +191,7 @@ def _case_row(record: ExecutionRecord, result: EvaluationResult, case: TestCase 
         "test_id": result.test_id,
         "category": result.category,
         "category_label": _CATEGORY_LABELS.get(result.category, result.category),
+        "owasp": owasp_entries(result.category),
         "objective": case.objective if case else "",
         "turns": [{"role": t.role, "content": t.content} for t in record.turns_sent],
         "attack": _last_user_message(record),
@@ -259,6 +267,10 @@ def start_run(req: RunRequest) -> RunCreated:
         suite_path = _suite_path(req.suite)
         if not suite_path.exists():
             raise SuiteError(f"suite not found: {suite_path}")
+        if req.target.startswith(("http://", "https://")) and not req.authorized and not public_mode():
+            raise TargetNotAuthorizedError(
+                "confirm that you own this agent or are authorized to test it (authorized=true)"
+            )
         unknown = sorted(set(req.categories) - set(_CATEGORY_LABELS))
         if unknown:
             raise SuiteError(f"unknown categories: {', '.join(unknown)}")
@@ -400,6 +412,8 @@ def run_details(run_id: str, output_dir: str | None = None) -> dict:
         "metrics": summary.metrics.model_dump(),
         "findings": [f.model_dump(mode="json") for f in summary.findings],
         "cases": rows,
+        "framework_version": summary.framework_version,
+        "suite_sha256": summary.suite_sha256,
     }
 
 
@@ -517,9 +531,53 @@ def config() -> dict:
         "targets": _available_targets(),
         "llm_configured": _llm_configured(),
         "categories": [
-            {"id": k, "label": v, "count": counts.get(k, 0)} for k, v in _CATEGORY_LABELS.items()
+            {"id": k, "label": v, "count": counts.get(k, 0), "owasp": owasp_entries(k)}
+            for k, v in _CATEGORY_LABELS.items()
         ],
     }
+
+
+def _results_dir() -> Path:
+    return Path(os.getenv("AGENT_REDTEAM_RESULTS_DIR", "docs/results"))
+
+
+@app.get("/experiments")
+def experiments() -> list[dict]:
+    """Published real-LLM experiment summaries (docs/results/llm_experiment_*.json)."""
+    out = []
+    base = _results_dir()
+    if not base.is_dir():
+        return out
+    for path in sorted(base.glob("llm_experiment_*.json"), reverse=True):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        targets = {}
+        for name, t in (data.get("targets") or {}).items():
+            trials = [float(x) for x in t.get("fixed_asr", [])]
+            adaptive = t.get("adaptive") or {}
+            targets[name] = {
+                "trials": trials,
+                "mean_asr": round(sum(trials) / len(trials), 4) if trials else None,
+                "min_asr": min(trials) if trials else None,
+                "max_asr": max(trials) if trials else None,
+                "errors": t.get("fixed_errors", []),
+                "adaptive": {
+                    "executed": adaptive.get("total_executed"),
+                    "violations": adaptive.get("total_violations"),
+                    "categories": adaptive.get("categories_attacked", []),
+                    "planner": adaptive.get("planner"),
+                },
+            }
+        out.append({
+            "file": path.name,
+            "date": path.stem.rsplit("_", 1)[-1],
+            "model": data.get("model"),
+            "repeats": data.get("repeats"),
+            "targets": targets,
+        })
+    return out
 
 
 @app.get("/", include_in_schema=False)
