@@ -161,6 +161,9 @@ class AgentResponse(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
     latency_ms: float | None = None
     error: str | None = None
+    # For agents that answer every user turn: the reply and tool calls of the last turn only.
+    last_reply: str | None = None
+    last_tool_calls: list[ToolCall] | None = None
 
 
 class ExecutionRecord(BaseModel):

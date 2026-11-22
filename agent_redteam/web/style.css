@@ -472,6 +472,21 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-2)
   .custom-box { padding-left: 14px; }
 }
 
+
+/* ---------- playground conversation ---------- */
+
+.thread { max-height: 560px; overflow-y: auto; border-bottom: 1px solid var(--line); }
+.thread .turn { padding: 14px 16px; gap: 8px; }
+.bubble { border-radius: 10px; padding: 10px 14px; max-width: 88%; word-break: break-word; }
+.you-b { justify-self: end; background: var(--panel-2); border: 1px solid var(--line-2); white-space: pre-wrap; font-size: 14px; }
+.bot-b { justify-self: start; background: var(--code); border: 1px solid var(--line); }
+.bot-b .prose { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.who-line { font-size: 11.5px; color: var(--text-3); margin-bottom: 4px; }
+.thread .turn > pre, .thread .judge, .thread .fix { max-width: 88%; }
+.divider { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--text-3); font-size: 12px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.composer .hint { margin: 0; padding: 0 14px 12px; font-size: 12px; color: var(--text-3); }
+
 /* ---------- print / Export PDF ---------- */
 
 @media print {

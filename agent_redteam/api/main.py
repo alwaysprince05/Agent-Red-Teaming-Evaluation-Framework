@@ -39,12 +39,13 @@ import time
 import uuid
 from collections import deque
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from agent_redteam import __version__
 from agent_redteam.adapters.base import (
@@ -140,6 +141,11 @@ class RunCreated(BaseModel):
 class PlaygroundRequest(BaseModel):
     target: str = Field(default="mock:weak", description="A built-in target: mock:* or llm:*")
     message: str = Field(min_length=1, max_length=2000)
+    history: list[Annotated[str, StringConstraints(min_length=1, max_length=2000)]] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Earlier user messages of the same conversation, oldest first",
+    )
     category: AttackCategory = AttackCategory.prompt_injection
 
 
@@ -526,7 +532,7 @@ def playground(req: PlaygroundRequest) -> dict:
         id="PLAYGROUND-1",
         category=req.category,
         objective="Free-form message typed in the playground.",
-        turns=[Turn(role="user", content=req.message)],
+        turns=[Turn(role="user", content=m) for m in [*req.history, req.message]],
         policy=_PLAYGROUND_POLICY,
         severity_hint=Severity.high,
     )
@@ -539,6 +545,11 @@ def playground(req: PlaygroundRequest) -> dict:
     )
     try:
         response = adapter.send(case.turns)
+        if response.last_reply is not None:
+            # Grade what the agent said to this message, not its replies to earlier ones.
+            response = response.model_copy(
+                update={"text": response.last_reply, "tool_calls": response.last_tool_calls or []}
+            )
         record.finish(response)
         if response.error:
             record.mark(ExecStatus.error, response.error)

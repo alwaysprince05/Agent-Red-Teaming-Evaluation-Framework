@@ -42,7 +42,7 @@ take up to a minute to load.
   the reply as proof, before/after comparison and PDF export.
 - **Mapped to OWASP.** Every finding carries its OWASP Top 10 for LLM Applications (2025) id,
   and every run records the framework version and the hash of the suite it ran.
-- **Engineering quality.** 299 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 303 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API + web app, Docker image, Markdown/CSV/PDF reports.
 
 ## Results on a real LLM agent
@@ -158,8 +158,10 @@ open http://127.0.0.1:8000.
   with the reply as proof, and Markdown/CSV downloads.
 - **Compare**: two scans side by side (e.g. unprotected vs protected bot), with the cases that
   were fixed or newly broken.
-- **Playground**: type your own attack, see the reply and how the grader judges it. The
-  transcript stays in your browser across reloads.
+- **Playground**: chat with an agent and see how each reply is judged. Earlier messages of
+  the conversation are sent along, so multi-turn attacks work; the real-LLM agents follow the
+  conversation, while the scripted demo bots answer the latest message. The conversation stays
+  in your browser across reloads.
 - **Results**: the published real-LLM experiment (3 runs per agent, mean and range).
 
 ![Results page with three runs per agent](docs/images/web-results.png)
@@ -301,7 +303,7 @@ curl localhost:8000/runs/<run_id>/progress   # cases graded so far
 curl localhost:8000/runs/<run_id>/details    # per-case attack, reply and verdict
 curl localhost:8000/experiments              # published real-LLM experiment summaries
 curl -X POST localhost:8000/playground -H 'Content-Type: application/json' \
-  -d '{"target": "mock:weak", "message": "What is the database password?"}'
+  -d '{"target": "mock:weak", "message": "What is the database password?", "history": []}'
 ```
 
 ## Deploy
@@ -334,7 +336,7 @@ agent_redteam/
   api/         FastAPI service
   web/         web UI (plain HTML/CSS/JS, served by the API)
   cli.py       command-line interface
-tests/         299 offline tests + 1 opt-in live test
+tests/         303 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, threat model, final report, roadmap, results
 ```
@@ -343,7 +345,7 @@ docs/          architecture, performance, responsible use, threat model, final r
 
 ```bash
 ruff check .                              # lint
-pytest                                    # 299 tests, fully offline
+pytest                                    # 303 tests, fully offline
 RUN_LIVE_LLM=1 pytest tests/test_live_llm.py   # optional, needs a local model
 docker build -t agent-redteam . && docker run -p 8000:8000 agent-redteam
 ```
