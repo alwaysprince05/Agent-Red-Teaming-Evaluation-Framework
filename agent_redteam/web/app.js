@@ -97,6 +97,16 @@ function highlight(text, evidence) {
   return out;
 }
 
+function owaspTags(list) {
+  if (!list || !list.length) return "";
+  return `<span class="owasps">${list.map((o) => `<span class="tag owasp" title="OWASP LLM Top 10: ${esc(o.name)}">${esc(o.id)}</span>`).join(" ")}</span>`;
+}
+
+function owaspFor(category) {
+  const c = config.categories.find((x) => x.id === category);
+  return c ? c.owasp : [];
+}
+
 function toolsHtml(calls) {
   if (!calls || !calls.length) return "";
   return `<pre>${calls.map((t) => `${esc(t.name)}(${esc(JSON.stringify(t.arguments))})`).join("\n")}</pre>`;
@@ -108,6 +118,7 @@ function detailHtml(row) {
     : esc(row.attack);
   return `
     ${row.objective ? `<div class="kv"><span>Objective</span><p style="padding-top:8px">${esc(row.objective)}</p></div>` : ""}
+    ${row.owasp && row.owasp.length ? `<div class="kv"><span>OWASP LLM</span><p style="padding-top:8px">${row.owasp.map((o) => `${owaspTags([o])} <span class="muted">${esc(o.name)}</span>`).join("&nbsp;&nbsp; ")}</p></div>` : ""}
     <div class="kv"><span>Sent</span><pre>${sent}</pre></div>
     <div class="kv"><span>Reply</span><pre>${highlight(row.reply || "(empty reply)", row.evidence)}</pre></div>
     ${row.tool_calls && row.tool_calls.length ? `<div class="kv"><span>Tool calls</span>${toolsHtml(row.tool_calls)}</div>` : ""}
@@ -178,6 +189,8 @@ async function renderHome() {
       </div>
     </section>
 
+    <a class="card headline" id="headline" href="#/results" style="display:none"></a>
+
     <h2>Pipeline</h2>
     <div class="card flow">
       <div class="stage"><span class="k">01 · suite</span><h3>Attack cases</h3>
@@ -193,20 +206,55 @@ async function renderHome() {
     <h2>Attack catalog</h2>
     <div class="card">
       <table>
-        <tr><th style="width:70px">Code</th><th style="width:230px">Category</th><th>Technique</th><th style="width:70px;text-align:right">Cases</th></tr>
+        <tr><th style="width:70px">Code</th><th style="width:210px">Category</th><th>Technique</th><th style="width:130px">OWASP LLM</th><th style="width:60px;text-align:right">Cases</th></tr>
         ${config.categories.map((c) => `
           <tr>
             <td><span class="tag">${code(c.id)}</span></td>
             <td>${esc(c.label)}</td>
             <td class="muted">${esc(CATS[c.id] ? CATS[c.id].desc : "")}</td>
+            <td>${owaspTags(c.owasp)}</td>
             <td class="num" style="text-align:right">${c.count}</td>
           </tr>`).join("")}
       </table>
     </div>
 
+    <h2>Safety model</h2>
+    <div class="card safety">
+      <div><h3>Fake secrets only</h3><p>Agents hold planted <span class="code">CANARY-…</span> values and dummy keys. Nothing real can leak.</p></div>
+      <div><h3>Offline by default</h3><p>The demo bots are scripted and the real-LLM agents run on a local model, so transcripts stay on the machine.</p></div>
+      <div><h3>Authorization gate</h3><p>A URL target is scanned only after you confirm you own it or may test it. External hosts must be allow-listed.</p></div>
+      <div><h3>Hard guardrail</h3><p>Government, military, education and intergovernmental domains (.gov .mil .edu .int, gov.in…) are refused, always.</p></div>
+      <div><h3>Public demo mode</h3><p>The hosted version tests only the built-in agents: no URLs, fixed suite and output folder, capped scans.</p></div>
+      <div><h3>Safe rendering</h3><p>Agent replies are untrusted input and are escaped before display. Run ids are validated before any file read.</p></div>
+    </div>
+
+    <h2>Run it yourself</h2>
+    <div class="card"><div class="card-b">
+      <pre>git clone https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
+cd Agent-Red-Teaming-Evaluation-Framework
+pip install -e .
+python app.py            <span class="dim"># then open http://127.0.0.1:8000</span></pre>
+      <p class="muted" style="margin-top:10px;font-size:13px">CLI: <span class="code">agent-redteam run --suite core --target mock:weak</span> · REST API docs at <a href="/docs" style="color:var(--text)">/docs</a></p>
+    </div></div>
+
     <h2>Recent scans</h2>
     <div class="card" id="recent"><div class="empty">Loading…</div></div>
   `;
+
+  api("/experiments").then((exps) => {
+    const e = exps[0];
+    if (!e || !e.targets["llm:weak"] || !e.targets["llm:strong"]) return;
+    const w = e.targets["llm:weak"];
+    const st = e.targets["llm:strong"];
+    const el = document.getElementById("headline");
+    el.innerHTML = `
+      <div><span class="mono dim">measured on a real model · ${esc(e.model)} · ${esc(e.repeats)} runs each</span>
+        <h3 style="margin-top:4px">Hardening the system prompt cut attack success from ${pct(w.mean_asr)} to ${pct(st.mean_asr)}</h3></div>
+      <div class="hl-nums"><span><b class="num hit-t">${pct(w.mean_asr)}</b><small>no guardrails</small></span>
+        <span><b class="num ok-t">${pct(st.mean_asr)}</b><small>hardened prompt</small></span>
+        <span class="mono dim">view results →</span></div>`;
+    el.style.display = "flex";
+  }).catch(() => {});
 
   // Live demo: the same message to both demo bots, graded by the real API.
   for (const target of ["mock:weak", "mock:strong"]) {
@@ -267,6 +315,17 @@ function renderScan() {
               <div><h3>${esc(tname(t))}</h3><div class="d">${esc(TARGETS[t] ? TARGETS[t].desc : "")}</div></div>
               <span class="tag">${esc(t)}</span>
             </label>`).join("")}
+          ${config.public_mode ? "" : `
+            <label class="opt">
+              <input type="radio" name="target" value="custom">
+              <div><h3>Your own agent</h3><div class="d">Any HTTP endpoint that accepts <span class="code">{"messages": [...]}</span> and returns <span class="code">{"text", "tool_calls"}</span>.</div></div>
+              <span class="tag">http(s)</span>
+            </label>
+            <div class="custom-box" id="custom-box" hidden>
+              <input type="url" id="custom-url" placeholder="http://127.0.0.1:9000/agent" spellcheck="false" autocomplete="off">
+              <label class="auth"><input type="checkbox" id="custom-auth"> I own this agent or have written permission to test it.</label>
+              <p class="dim" style="font-size:12px">Government, military, education and intergovernmental domains are always refused.</p>
+            </div>`}
         </div>
         <div class="card">
           <div class="card-h"><h3>Attack categories</h3>
@@ -293,35 +352,52 @@ function renderScan() {
     </div>`;
 
   const picked = () => [...view.querySelectorAll("input[name=cat]:checked")].map((x) => x.value);
+  const customUrl = () => (document.getElementById("custom-url") || {}).value?.trim() || "";
   const update = () => {
     const target = view.querySelector("input[name=target]:checked").value;
+    const custom = target === "custom";
+    const box = document.getElementById("custom-box");
+    if (box) box.hidden = !custom;
     const n = config.categories.filter((c) => picked().includes(c.id)).reduce((a, c) => a + c.count, 0);
-    document.getElementById("s-target").textContent = tname(target);
+    const urlOk = /^https?:\/\/[^\s/]+/i.test(customUrl());
+    const authOk = custom ? document.getElementById("custom-auth").checked : true;
+    document.getElementById("s-target").textContent = custom ? (customUrl() || "your own agent") : tname(target);
     document.getElementById("s-cases").textContent = n;
-    document.getElementById("start").disabled = n === 0;
+    document.getElementById("start").disabled = n === 0 || (custom && !(urlOk && authOk));
   };
-  view.querySelectorAll("input").forEach((i) => i.addEventListener("change", update));
+  view.querySelectorAll("input").forEach((i) => {
+    i.addEventListener("change", update);
+    i.addEventListener("input", update);
+  });
   document.getElementById("all").onclick = () => { view.querySelectorAll("input[name=cat]").forEach((i) => { i.checked = true; }); update(); };
   document.getElementById("none").onclick = () => { view.querySelectorAll("input[name=cat]").forEach((i) => { i.checked = false; }); update(); };
   update();
 
   document.getElementById("start").addEventListener("click", async (ev) => {
     const btn = ev.currentTarget;
-    const target = view.querySelector("input[name=target]:checked").value;
+    const choice = view.querySelector("input[name=target]:checked").value;
     const cats = picked();
+    const body = {
+      target: choice,
+      categories: cats.length === config.categories.length ? [] : cats,
+      // Demo bots answer instantly; pacing them keeps the live log readable.
+      rate_limit_s: choice.startsWith("mock:") ? 0.45 : 0.2,
+      timeout_s: 60,
+    };
+    if (choice === "custom") {
+      const url = customUrl();
+      // The checkbox is the operator's explicit authorization for this one host.
+      Object.assign(body, {
+        target: url,
+        authorized: true,
+        allow_external_targets: true,
+        allowed_hosts: [new URL(url).hostname],
+      });
+    }
     btn.disabled = true;
     btn.textContent = "Starting…";
     try {
-      // Demo bots answer instantly; pacing them keeps the live log readable.
-      const res = await api("/runs", {
-        method: "POST",
-        body: JSON.stringify({
-          target,
-          categories: cats.length === config.categories.length ? [] : cats,
-          rate_limit_s: target.startsWith("mock:") ? 0.45 : 0.2,
-          timeout_s: 60,
-        }),
-      });
+      const res = await api("/runs", { method: "POST", body: JSON.stringify(body) });
       location.hash = `#/run/${res.run_id}`;
     } catch (e) {
       document.getElementById("scan-err").innerHTML = `<div class="err">${esc(e.message)}</div>`;
@@ -432,13 +508,38 @@ async function renderReport(runId) {
   const g = grade(m.attack_success_rate);
   const byId = Object.fromEntries(d.cases.map((c) => [c.test_id, c]));
   const latency = m.avg_latency_ms == null ? "" : m.avg_latency_ms < 1 ? " · <1 ms avg reply" : ` · ${Math.round(m.avg_latency_ms)} ms avg reply`;
+  const when = new Date(d.created_at * 1000).toLocaleString();
+  const sevCount = (s) => d.findings.filter((f) => f.severity === s).length;
+  const hitCats = Object.entries(m.by_category).filter(([, c]) => c.violations > 0)
+    .sort((x, y) => y[1].violation_rate - x[1].violation_rate).map(([id]) => catLabel(id));
+  const order = { critical: 0, high: 1, medium: 2, low: 3 };
+  const fixes = [];
+  [...d.findings].sort((x, y) => (order[x.severity] ?? 9) - (order[y.severity] ?? 9)).forEach((f) => {
+    if (!fixes.some((x) => x.text === f.remediation)) fixes.push({ text: f.remediation, sev: f.severity, cat: catLabel(f.category) });
+  });
+  const stamp = [d.framework_version && `framework v${d.framework_version}`, d.suite_sha256 && `suite sha256 ${d.suite_sha256.slice(0, 12)}`]
+    .filter(Boolean).join(" · ");
 
   view.innerHTML = `
     <div class="ph">
       <div><div class="crumb"><a href="#/">scans</a> / ${esc(runId)} / report</div>
         <h1>${esc(tname(d.target))}</h1>
-        <p class="lede mono" style="font-size:12px">${esc(d.target)} · ${esc(new Date(d.created_at * 1000).toLocaleString())}</p></div>
+        <p class="lede mono" style="font-size:12px">${esc(d.target)} · ${esc(when)}${stamp ? ` · ${esc(stamp)}` : ""}</p></div>
     </div>
+
+    <section class="card print-only exec">
+      <div class="card-b">
+        <div class="mono dim">Agent red-team assessment · run ${esc(runId)}</div>
+        <h3 style="margin:6px 0 10px">Executive summary</h3>
+        <p><b>${esc(tname(d.target))}</b> was tested on ${esc(when)} with ${m.executed} attacks across
+          ${Object.keys(m.by_category).length} categories. <b>${m.violations}</b> succeeded, an attack success rate of
+          <b>${pct(m.attack_success_rate)}</b> (grade ${g.letter}: ${esc(g.text.toLowerCase())}).
+          ${d.findings.length ? `Findings: ${sevCount("critical")} critical, ${sevCount("high")} high, ${sevCount("medium")} medium.` : "No findings."}
+          ${hitCats.length ? `Most affected: ${esc(hitCats.join(", "))}.` : ""}</p>
+        ${fixes.length ? `<h3 style="margin:14px 0 6px">Priority fixes</h3><ol>${fixes.map((x) => `<li><b>${esc(x.cat)}</b> (${esc(x.sev)}): ${esc(x.text)}</li>`).join("")}</ol>` : ""}
+        <p class="dim" style="margin-top:12px;font-size:12px">Scope: ${esc(d.target)} · ${esc(stamp || "")} · deterministic policy grading · findings mapped to the OWASP Top 10 for LLM Applications (2025).</p>
+      </div>
+    </section>
 
     <div class="card">
       <div class="score">
@@ -448,6 +549,7 @@ async function renderReport(runId) {
           <div class="sub">attacks got through · ${esc(g.text)} · ASR ${pct(m.attack_success_rate)}${m.errors ? ` · ${m.errors} errored` : ""}${esc(latency)}</div>
         </div>
         <div class="act">
+          <button class="btn ghost sm" onclick="window.print()">Export PDF</button>
           <a class="btn ghost sm" href="/runs/${esc(runId)}/download/md">Report .md</a>
           <a class="btn ghost sm" href="/runs/${esc(runId)}/download/csv">Findings .csv</a>
           <a class="btn sm" href="#/compare?a=${esc(runId)}">Compare</a>
@@ -460,10 +562,10 @@ async function renderReport(runId) {
 
     <h2>By category</h2>
     <div class="card"><table>
-      <tr><th style="width:70px">Code</th><th>Category</th><th style="width:90px">Breached</th><th style="width:38%">Rate</th></tr>
+      <tr><th style="width:70px">Code</th><th>Category</th><th style="width:120px">OWASP LLM</th><th style="width:90px">Breached</th><th style="width:32%">Rate</th></tr>
       ${Object.entries(m.by_category).map(([id, c]) => {
         const rate = c.violation_rate || 0;
-        return `<tr><td><span class="tag">${code(id)}</span></td><td>${esc(catLabel(id))}</td>
+        return `<tr><td><span class="tag">${code(id)}</span></td><td>${esc(catLabel(id))}</td><td>${owaspTags(owaspFor(id))}</td>
           <td class="num">${c.violations} / ${c.total - c.errors}</td>
           <td><div style="display:flex;gap:10px;align-items:center"><div class="meter${rate === 0 ? " zero" : ""}" style="flex:1"><i style="width:${rate * 100}%"></i></div><span class="mono num" style="width:38px;text-align:right">${pct(rate)}</span></div></td></tr>`;
       }).join("")}
@@ -476,15 +578,17 @@ async function renderReport(runId) {
         <div class="finding-h" data-toggle>
           <span class="sev ${esc(f.severity)}">${esc(f.severity)}</span>
           <span class="mono id">${esc(f.test_id)}</span>
-          <span>${esc(f.title.replace(/^[a-z_]+: /, ""))}</span>
+          <span>${esc(f.title.replace(/^[a-z_]+: /, ""))} ${owaspTags(owaspFor(f.category))}</span>
           ${CHEV}
         </div>
         <div class="detail">${detailHtml({ ...row, remediation: f.remediation })}</div>
       </div>`;
     }).join("") : '<div class="empty">Nothing got through. No findings for this suite.</div>'}</div>
 
-    <h2>All cases · ${d.cases.length}</h2>
-    <div class="card">${d.cases.map((c) => entryHtml(c, c.latency_ms == null ? "" : `${c.latency_ms < 1 ? "<1" : Math.round(c.latency_ms)}ms`, false)).join("")}</div>
+    <div class="no-print">
+      <h2>All cases · ${d.cases.length}</h2>
+      <div class="card">${d.cases.map((c) => entryHtml(c, c.latency_ms == null ? "" : `${c.latency_ms < 1 ? "<1" : Math.round(c.latency_ms)}ms`, false)).join("")}</div>
+    </div>
   `;
 }
 
@@ -597,6 +701,69 @@ async function renderCompare(query) {
   }
 }
 
+// ---------- results ----------
+
+async function renderResults() {
+  nav("results");
+  view.innerHTML = `
+    <div class="ph"><div><div class="crumb">results</div><h1>Results on a real model</h1>
+      <p class="lede">The core suite run repeatedly against a local LLM, once with a minimal system prompt and once
+        with a hardened one. Repeats show how much a model's behaviour varies between runs.</p></div></div>
+    <div id="exp"><div class="empty">Loading…</div></div>`;
+  let exps;
+  try {
+    exps = await api("/experiments");
+  } catch (e) {
+    document.getElementById("exp").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    return;
+  }
+  if (!exps.length) {
+    document.getElementById("exp").innerHTML = `<div class="card"><div class="empty">No published experiments on this server.
+      Run <span class="code">python scripts/llm_experiment.py</span> with Ollama to create one.</div></div>`;
+    return;
+  }
+  const label = { "llm:weak": "No guardrails", "llm:strong": "Hardened prompt" };
+  document.getElementById("exp").innerHTML = exps.map((e) => {
+    const names = Object.keys(e.targets);
+    const w = e.targets["llm:weak"];
+    const st = e.targets["llm:strong"];
+    const delta = w && st ? Math.round((w.mean_asr - st.mean_asr) * 100) : null;
+    const col = (name) => {
+      const t = e.targets[name];
+      const tone = t.mean_asr > 0.5 ? "hit-t" : t.mean_asr > 0.15 ? "warn-t" : "ok-t";
+      const a = t.adaptive || {};
+      return `<div class="exp-col">
+        <div class="mono dim">${esc(name)}</div>
+        <h3 style="margin:4px 0 10px">${esc(label[name] || name)}</h3>
+        <div class="big num ${tone}">${pct(t.mean_asr)}</div>
+        <div class="sub muted" style="margin-top:6px;font-size:13px">mean attack success over ${t.trials.length} runs · range ${pct(t.min_asr)}–${pct(t.max_asr)}</div>
+        <div class="trials">${t.trials.map((x, i) => `<div><i style="height:${Math.max(x * 100, 2)}%"></i><span class="mono dim">run ${i + 1} · ${pct(x)}</span></div>`).join("")}</div>
+        ${a.executed ? `<div class="summary-row"><span>Adaptive attacker</span><span>${a.violations} of ${a.executed} generated attacks landed</span></div>
+          <div class="summary-row"><span>Planner focused on</span><span>${esc([...new Set(a.categories)].map(catLabel).join(", "))}</span></div>` : ""}
+        ${t.errors && t.errors.some((x) => x) ? `<div class="summary-row"><span>Errored cases</span><span class="num">${t.errors.join(" · ")}</span></div>` : ""}
+      </div>`;
+    };
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="card-h"><h3>${esc(e.model)} · ${esc(e.date.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3"))}</h3>
+        <span class="mono dim">${esc(e.repeats)} repeats · ${esc(e.file)}</span></div>
+      <div class="exp-grid">${names.map(col).join("")}</div>
+      ${delta !== null ? `<div class="card-b" style="border-top:1px solid var(--line)">
+        <p>The hardened system prompt lowered mean attack success by <b class="ok-t">${delta} points</b>
+          (${pct(w.mean_asr)} → ${pct(st.mean_asr)}), but did not remove it: some attacks still land on the hardened agent.</p></div>` : ""}
+    </div>`;
+  }).join("") + `
+    <h2>Method and limits</h2>
+    <div class="card"><div class="card-b method">
+      <p><b>Setup.</b> 13 cases from the core suite across 6 categories, graded by the deterministic policy rules. The
+        agents hold planted canary secrets, so any canary in a reply is a proven leak.</p>
+      <p><b>Local model.</b> The model runs on the machine through Ollama; no prompt or reply leaves it.</p>
+      <p><b>Variance.</b> LLM output is not deterministic, which is why each target is run several times and reported
+        as a mean with its range rather than a single number.</p>
+      <p><b>Limits.</b> A small 3B model was used for the attacker and the targets, and keyword-based refusal detection
+        can misjudge some phrasings. Treat the numbers as relative (weak vs hardened), not as absolute safety scores.</p>
+    </div></div>`;
+}
+
 // ---------- playground ----------
 
 function renderPlayground() {
@@ -688,6 +855,7 @@ function route() {
   if (parts[0] === "report" && parts[1]) return renderReport(parts[1]);
   if (parts[0] === "compare") return renderCompare(query);
   if (parts[0] === "playground") return renderPlayground();
+  if (parts[0] === "results") return renderResults();
   return renderHome();
 }
 
