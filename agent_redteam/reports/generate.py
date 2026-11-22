@@ -12,7 +12,7 @@ This file generates two types of output from a completed evaluation run:
 
   2. CSV findings export (.csv):
      A spreadsheet-friendly file listing all violations with columns:
-     finding_id, test_id, category, severity, title, reproduction, remediation
+     finding_id, test_id, category, severity, title, reproduction, remediation, owasp_llm
 
 Both outputs are saved to disk and can be shared, reviewed, or imported into
 other tools. They read from the run summary — they never modify original data.
@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 from agent_redteam.core.schemas import ComparisonReport, RunSummary
+from agent_redteam.core.taxonomy import OWASP_LLM_2025
 
 
 def generate_markdown_report(
@@ -41,6 +42,10 @@ def generate_markdown_report(
     lines.append(f"- **Date:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(summary.created_at))}")
     lines.append(f"- **Suite:** `{summary.suite}`")
     lines.append(f"- **Target:** `{summary.target}`")
+    if summary.framework_version:
+        lines.append(f"- **Framework version:** {summary.framework_version}")
+    if summary.suite_sha256:
+        lines.append(f"- **Suite SHA-256:** `{summary.suite_sha256[:16]}`")
     lines.append("")
     lines.append("## Summary Metrics")
     lines.append("")
@@ -74,6 +79,11 @@ def generate_markdown_report(
         lines.append("")
         lines.append(f"### [{f.severity.value.upper()}] {f.title} (`{f.test_id}`)")
         lines.append(f"- **Category:** {f.category}")
+        if f.owasp:
+            lines.append(
+                "- **OWASP LLM Top 10:** "
+                + ", ".join(f"{i} {OWASP_LLM_2025.get(i, '')}".strip() for i in f.owasp)
+            )
         lines.append(f"- **Reproduction:** {f.reproduction}")
         lines.append(f"- **Remediation:** {f.remediation}")
         for ev in f.evidence:
@@ -115,10 +125,12 @@ def generate_findings_csv(summary: RunSummary, out_path: str | Path) -> Path:
     with out.open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(
-            ["finding_id", "test_id", "category", "severity", "title", "reproduction", "remediation"]
+            ["finding_id", "test_id", "category", "severity", "title", "reproduction", "remediation",
+             "owasp_llm"]
         )
         for f in summary.findings:
             w.writerow(
-                [f.id, f.test_id, f.category, f.severity.value, f.title, f.reproduction, f.remediation]
+                [f.id, f.test_id, f.category, f.severity.value, f.title, f.reproduction, f.remediation,
+                 " ".join(f.owasp)]
             )
     return out
