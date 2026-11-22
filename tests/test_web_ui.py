@@ -264,6 +264,12 @@ class TestPublicMode:
 
 
 class TestStaticAndConfig:
+    def test_ui_assets_are_never_stale(self):
+        page = client.get("/")
+        assert page.headers["cache-control"] == "no-cache"
+        assert "/static/app.js?v=" in page.text and "/static/style.css?v=" in page.text
+        assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
+
     def test_static_files(self):
         for name, kind in (("app.js", "javascript"), ("style.css", "text/css")):
             r = client.get(f"/static/{name}")

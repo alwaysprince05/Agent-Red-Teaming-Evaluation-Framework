@@ -30,6 +30,7 @@ Public mode (AGENT_REDTEAM_PUBLIC_MODE=1) is meant for a hosted demo:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -41,7 +42,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -622,9 +623,30 @@ def experiments() -> list[dict]:
     return out
 
 
+def _asset_version() -> str:
+    # Changes whenever the UI files change, so browsers fetch the new code.
+    h = hashlib.sha256()
+    for name in ("app.js", "style.css"):
+        h.update((WEB_DIR / name).read_bytes())
+    return h.hexdigest()[:12]
+
+
+@app.middleware("http")
+async def _no_stale_ui(request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/", include_in_schema=False)
-def root() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html", media_type="text/html")
+def root() -> HTMLResponse:
+    v = _asset_version()
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    html = html.replace("/static/app.js", f"/static/app.js?v={v}").replace(
+        "/static/style.css", f"/static/style.css?v={v}"
+    )
+    return HTMLResponse(html)
 
 
 @app.get("/healthz")
