@@ -16,6 +16,7 @@ under runs/<run_id>/ that can be used for dashboards, reports, and comparisons.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from agent_redteam.adapters.base import AgentAdapter
 from agent_redteam.core.engine import EngineConfig, ExecutionEngine
 from agent_redteam.core.schemas import (
     EvaluationResult,
+    ExecutionRecord,
     Finding,
     RunSummary,
     SuiteMetrics,
@@ -49,6 +51,13 @@ _SEVERITY_REMEDIATION = {
 }
 
 _FALLBACK_REMEDIATION = "Review the flagged response, harden the relevant policy, and re-run the suite."
+
+# Called after each case is executed and graded (used by the web UI for live progress).
+CaseCallback = Callable[[TestCase, ExecutionRecord, EvaluationResult], None]
+
+
+def remediation_for(category: str) -> str:
+    return _SEVERITY_REMEDIATION.get(category, _FALLBACK_REMEDIATION)
 
 
 @dataclass
@@ -80,7 +89,7 @@ def _build_finding(case: TestCase, result: EvaluationResult, record) -> Finding:
         title=f"{category}: {shorten_text(case.objective, 80)}",
         severity=result.severity,
         reproduction=repro,
-        remediation=_SEVERITY_REMEDIATION.get(category, _FALLBACK_REMEDIATION),
+        remediation=remediation_for(category),
         evidence=result.evidence,
     )
 
@@ -140,23 +149,34 @@ def execute_run(
     options: RunOptions | None = None,
     *,
     run_id: str | None = None,
+    categories: list[str] | None = None,
+    on_case: CaseCallback | None = None,
 ) -> tuple[str, RunSummary, list[EvaluationResult], list]:
-    """Run the full pipeline and persist artifacts. Returns (run_id, summary, results, records)."""
-    from agent_redteam.core.suite import load_suite
+    """Run the full pipeline and persist artifacts. Returns (run_id, summary, results, records).
+
+    categories: only run cases from these categories (all cases when empty or None).
+    on_case: optional callback invoked once per case, right after it is graded.
+    """
+    from agent_redteam.core.suite import SuiteError, load_suite
 
     opts = options or RunOptions()
     rid = run_id or new_run_id()
     cases: list[TestCase] = load_suite(suite_path)
+    if categories:
+        wanted = set(categories)
+        cases = [c for c in cases if c.category.value in wanted]
+        if not cases:
+            raise SuiteError(f"no test cases in the suite match categories {sorted(wanted)}")
 
     engine = ExecutionEngine(
         adapter,
         EngineConfig(timeout_s=opts.timeout_s, rate_limit_s=opts.rate_limit_s, max_turns=opts.max_turns),
     )
-    records = {case.id: engine.run_case(rid, case) for case in cases}
-
+    records: dict[str, ExecutionRecord] = {}
     results: list[EvaluationResult] = []
     for case in cases:
-        record = records[case.id]
+        record = engine.run_case(rid, case)
+        records[case.id] = record
         if opts.use_llm_judge and judge_configured():
             r = evaluate_case_llm_judge(case, record)
             if r.status.value == "error" and opts.judge_fallback_to_deterministic:
@@ -164,6 +184,8 @@ def execute_run(
         else:
             r = evaluate_case(case, record)
         results.append(r)
+        if on_case is not None:
+            on_case(case, record, r)
 
     findings = [
         _build_finding(case, r, records[case.id])
