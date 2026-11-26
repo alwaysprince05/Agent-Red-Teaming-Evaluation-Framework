@@ -73,6 +73,14 @@
       titles end at a whole word; headline reads "N pts lower"; ids and dates no longer wrap
 - [x] Final report and README state PRD coverage and what is not implemented
 
+### Delivered in v2.3.0
+
+- [x] Autonomous scan of any agent URL: recon, model-written attacks from two attacker models,
+      judge-model panel with tie-break, Strong / Moderate / Weak verdict with score and reasons
+- [x] URL adapter detects common agent API shapes; public demo refuses private and internal addresses
+- [x] Practice agents (store, HR, DevOps) hosted on Render behind an access token
+- [x] `agent-redteam scan` CLI command; `.env` loading; retries on provider rate limits
+
 # Stretch goals (planned)
 
 1. ~~Adaptive attack generation / mutation (fuzzing-style broadening of coverage).~~

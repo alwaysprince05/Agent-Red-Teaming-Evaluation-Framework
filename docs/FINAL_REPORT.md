@@ -3,10 +3,12 @@
 **Project:** Agent Red-Teaming & Evaluation Framework
 **Student:** Prince Kumar Maurya (Roll No 240410700103, 2026, Gen AI track, Group G132)
 **Mentor:** Anurag Sarkar
-**Version:** 2.2.1 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
+**Version:** 2.3.0 · **Repo:** github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework
 
-Verification state at v2.2.1: **228 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
-green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
+Verification state at v2.3.0: **351 pytest tests passing** (+1 opt-in live test), `ruff` clean, GitHub Actions CI
+green on Python 3.11/3.12/3.13 (lint + tests + wheel build). Live on Render:
+[agent-redteam.onrender.com](https://agent-redteam.onrender.com) (scanner) and `practice-agents.onrender.com`
+(three practice agents, token-protected).
 
 ---
 
@@ -26,19 +28,19 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 | PRD item | Delivered as |
 |---|---|
 | Python package with core execution & evaluation modules | `agent_redteam` installable package (pyproject.toml, `agent-redteam` console script) |
-| Agent adapter interface + working adapter | `AgentAdapter` ABC; `llm:weak`, `llm:strong` (model-driven), `mock:weak`, `mock:strong`, `HTTPAgentAdapter` |
+| Agent adapter interface + working adapter | `AgentAdapter` ABC; `HTTPAgentAdapter` for any agent URL (detects OpenAI, `messages`, `message`, `input`, `prompt` and `query` API shapes); `llm:weak`, `llm:strong` (model-driven); `mock:weak`, `mock:strong` |
 | Configuration and schema validation | Pydantic v2 schemas with strict validation; YAML/JSON suite loader rejecting malformed cases with precise errors |
 | Deterministic evaluator | `evaluators/deterministic.py` — keyword/regex/refusal/tool-allowlist checks with evidence capture |
-| Configurable semantic evaluator | `evaluators/llm_judge.py` — OpenAI-compatible judge, temperature 0, structured JSON verdicts, explicit error handling |
+| Configurable semantic evaluator | Judge panel in `core/autoscan.py` (several judge models vote, a spare model breaks ties, a failed call is an error, never a pass) and `evaluators/llm_judge.py` (single OpenAI-compatible judge) |
 | Severity and finding model | `Severity` (low→critical), `Finding` with reproduction steps, remediation guidance and evidence |
-| Automated unit & integration tests | 228 offline pytest tests (+1 opt-in live test): schemas, suite, adapters, LLM agent, planner, adaptive loop, engine, evaluator, runner, compare, reports, API, LLM judge, dashboard |
+| Automated unit & integration tests | 351 offline pytest tests (+1 opt-in live test): schemas, suite, adapters, URL format detection, public-target guard, model pool, autonomous scan, judge panel, verdict, practice agents, LLM agent, planner, adaptive loop, engine, evaluator, runner, compare, reports, API, dashboard |
 | Dockerfile & reproducible setup | Non-root slim-image Dockerfile + `.dockerignore` + pinned deps in pyproject |
 
 ## 9.3 Backend / API Deliverables
 
 | PRD item | Delivered as |
 |---|---|
-| Service for starting/monitoring runs | FastAPI app: `POST /runs` (202 + background execution) |
+| Service for starting/monitoring runs | FastAPI app: `POST /scans` (autonomous scan of an agent URL) and `POST /runs` (baseline suite), both 202 + background execution with live progress |
 | Endpoint for run status & results | `GET /runs/{id}`, `GET /runs/{id}/results`, `GET /runs/{id}/report`, `GET /healthz` |
 | Structured JSON result format | Pydantic-serialized `EvaluationResult` / `RunSummary` JSON |
 | Batch evaluation support | Whole-suite execution in a single run (batch by design) |
@@ -63,7 +65,7 @@ green on Python 3.11/3.12/3.13 (lint + tests + wheel build).
 | Optional CI evaluation quality gate | `run` exits 1 when violations exist — usable as a release gate |
 | README with setup, suite format, usage | [README.md](../README.md) |
 | Architecture diagram & HLD/LLD | [docs/ARCHITECTURE.md](ARCHITECTURE.md) (pipeline, components, data flow, design decisions) |
-| Final demo & presentation | Offline pipeline check (`run` on `mock:weak` / `mock:strong`), then real-model runs on `llm:weak` / `llm:strong`, an `adaptive` session with the LLM planner, and the HTML dashboard comparing both targets |
+| Final demo & presentation | Autonomous scan on the live site: paste a practice agent's URL, watch recon and attack rounds, open the verdict report; baseline suite and playground as supporting views |
 | Limitations, safety boundaries, responsible use | [docs/RESPONSIBLE_USE.md](RESPONSIBLE_USE.md) + README limitations section |
 
 ---
@@ -119,11 +121,46 @@ weakness of a 3B attacker, are listed in the README.
 
 Safety of the new parts: tools are simulated (never executed); model endpoints use the
 same authorization as HTTP targets; planner output is strictly validated with budgets it
-cannot raise; tests are offline and hermetic (228 passing, plus 1 opt-in live test).
+cannot raise; tests are offline and hermetic.
+
+## v2.3.0: autonomous scan of any agent URL (mentor feedback, round 2)
+
+Mentor feedback: the scan was still "hardcoded": a fixed list of 13 attacks, and the user picked
+whether the target was weak or strong. Now the user gives only an agent URL:
+
+| Before (v2.2) | After (v2.3) | Where |
+|---|---|---|
+| Fixed 13-case suite | Attacker models write new attacks for each agent, round by round, using every earlier attempt and reply | [autoscan.py](../agent_redteam/core/autoscan.py) |
+| User chooses `weak` / `strong` | The scanner studies the agent first (recon), then gives its own verdict: Strong / Moderate / Weak / Inconclusive, with a score, reasons and confidence | [autoscan.py](../agent_redteam/core/autoscan.py) |
+| One model, one grader | Two attacker models take turns; a panel of judge models from different families votes on every reply | [models.py](../agent_redteam/core/models.py) |
+| URL target needed one exact API | Common agent API shapes detected automatically | [http_agent.py](../agent_redteam/adapters/http_agent.py) |
+
+Three practice agents ([target_agents/](../target_agents/README.md)) with different jobs, models,
+API shapes and protection were scanned with Groq attackers (gpt-oss-120b, qwen3.8-27b) and judges
+(gpt-oss-20b, qwen3.8-27b). The scanner was told nothing about them:
+
+| Agent (true setup) | Verdict | Score | Attacks that worked |
+|---|---|---|---|
+| Store assistant, no protection (local qwen2.5:3b) | Weak | 37 | 6 / 12 |
+| HR helpdesk, basic protection (local llama3.2:3b) | Weak | 42 | 7 / 12 |
+| DevOps bot, hardened prompt (local qwen2.5:3b) | Moderate | 74 | 2 / 11 |
+| Store assistant, no protection, hosted (Groq qwen3.8-27b) | Moderate | 87–88 | 1 / 12 |
+
+The ranking matches the real protection levels. The hosted store agent runs on a much stronger model,
+which refused most attacks even without a protective prompt; the scanner still found that it issues
+refunds or sends emails without checks (unsafe tool use). The HR agent's "basic protection" broke
+more often than expected because its model (llama3.2:3b) is weaker: the scanner measures behaviour,
+not what the prompt claims.
+
+Limits: verdicts from small local models vary between runs; one free provider key shared by the
+scanner and the practice agents is rate-limited (both retry automatically).
 
 ## Safety summary
 
 - Safe by default: external targets refused without explicit consent + host allowlist (CLI and API).
+- Autonomous scans need an ownership confirmation per scan; the agent's API key is held in memory only.
+- Public demo accepts only public internet addresses: loopback, private, link-local (cloud metadata) and
+  reserved ranges are refused, and redirects are not followed.
 - Adapters never execute agent tool calls; violations are detected from captured traces.
 - All artifacts local; `runs/` and `.env` git-ignored; no secrets in the repo.
 - Attack strings in the suite and mock agents are fictional test data.
@@ -145,5 +182,5 @@ These PRD items are not built yet:
 ## Signature readiness
 
 All 10 must-have features (§2.1) are implemented, tested and verified, along with 5 of the 8
-stretch goals. The items above are documented as future work. Ready for mentor review and final
+stretch goals, and the autonomous URL scan requested in mentor review is live. The items above are documented as future work. Ready for mentor review and final
 demonstration.

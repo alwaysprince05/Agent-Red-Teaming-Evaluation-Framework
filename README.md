@@ -1,7 +1,7 @@
 # Agent Red-Teaming & Evaluation Framework
 
 ![CI](https://github.com/alwaysprince05/Agent-Red-Teaming-Evaluation-Framework/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/badge/release-v2.2.1-blue)
+![Release](https://img.shields.io/badge/release-v2.3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Live demo](https://img.shields.io/badge/live%20demo-agent--redteam.onrender.com-ff5a36)](https://agent-redteam.onrender.com)
@@ -13,9 +13,9 @@ whether the agent is Strong, Moderate or Weak, with a score, reasons and evidenc
 
 OJT project (Gen AI track, Group G132) by **Prince Kumar Maurya** · Mentor: **Anurag Sarkar**
 
-**Live demo: [agent-redteam.onrender.com](https://agent-redteam.onrender.com)**, running in public demo mode (built-in
-agents only). It is hosted on a free instance that sleeps when idle, so the first visit can
-take up to a minute to load.
+**Live demo: [agent-redteam.onrender.com](https://agent-redteam.onrender.com)**, running in public demo mode: autonomous
+scans of public agent URLs (capped at 3 rounds × 4 attacks) plus the baseline suite and playground.
+It is hosted on a free instance that sleeps when idle, so the first visit can take up to a minute to load.
 
 > **Responsible use:** only test agents you own or have written permission to test. External
 > targets are refused unless explicitly authorized. See [docs/RESPONSIBLE_USE.md](docs/RESPONSIBLE_USE.md).
@@ -46,7 +46,7 @@ take up to a minute to load.
   the reply as proof, before/after comparison and PDF export.
 - **Mapped to OWASP.** Every finding carries its OWASP Top 10 for LLM Applications (2025) id,
   and every run records the framework version and the hash of the suite it ran.
-- **Engineering quality.** 309 offline tests (no model or API key needed), CI on Python
+- **Engineering quality.** 351 offline tests (no model or API key needed), CI on Python
   3.11–3.13, CLI + REST API + web app, Docker image, Markdown/CSV/PDF reports.
 
 ## Results on a real LLM agent
@@ -83,12 +83,14 @@ Measured against the project PRD (full mapping with evidence in
 | Must-have features (PRD §2.1) | **10 / 10** implemented and tested |
 | Stretch goals (PRD §2.2) | **5 / 8**: attack generation, indirect injection, tool-use safety, dashboard, CI gate |
 | Attack categories (PRD §4.2) | **6 / 10**: prompt injection, jailbreak, data leakage, unsafe tool use, multi-turn, indirect injection |
-| Added beyond the PRD | Web app (live scans, playground, compare, PDF report), OWASP LLM Top 10 mapping, run provenance, protected-domain guardrail, threat model |
+| Added beyond the PRD | Autonomous scan of any agent URL with model-written attacks, a judge panel and an automatic verdict; web app (live scans, playground, compare, PDF report), OWASP LLM Top 10 mapping, run provenance, protected-domain guardrail, threat model |
 | Not implemented | Memory, goal-manipulation, hallucination and availability attacks; reviewer override of verdicts; concurrent execution; token-cost tracking; plugin system; public dataset adapters; object-store backend |
 
 ## Autonomous scan
 
 Point the scanner at an agent's URL. It is told nothing else.
+
+![Live verdict report: the scanner rated the hosted store agent Moderate, 88/100, and lists what it learned about the agent](docs/images/web-autonomous-report.png)
 
 1. **Recon.** An attacker model writes a few harmless questions, asks the agent, and builds a
    profile: what the agent is for, which tools and data it mentions, how it defends itself.
@@ -210,8 +212,11 @@ open http://127.0.0.1:8000.
 |---|---|
 | ![Report card with grade, OWASP mapping and findings](docs/images/web-report.png) | ![Comparison of the unprotected and protected agent](docs/images/web-compare.png) |
 
-- **New scan**: pick an agent and the attack categories, then watch each attack get sent
-  and graded live. Click a row to see what was sent, the reply, the rule that fired and the fix.
+- **New scan**: paste the URL of an agent you own (and its API key, if it needs one). Watch the
+  scanner study the agent, write attacks round by round and grade each reply live, then get its
+  verdict. The old fixed 13-case list is still there as **Baseline suite**.
+- **Verdict report**: Strong / Moderate / Weak with a score and reasons, what the scanner learned
+  about the agent, each round's plan, and every attack with the judges' votes.
 - **Report card**: grade A–F from the attack success rate, results by category, every finding
   with the reply as proof, and Markdown/CSV downloads.
 - **Compare**: two scans side by side (e.g. unprotected vs protected bot), with the cases that
@@ -396,7 +401,7 @@ agent_redteam/
   api/         FastAPI service
   web/         web UI (plain HTML/CSS/JS, served by the API)
   cli.py       command-line interface
-tests/         309 offline tests + 1 opt-in live test
+tests/         351 offline tests + 1 opt-in live test
 scripts/       real-LLM experiment runner
 docs/          architecture, performance, responsible use, threat model, final report, roadmap, results
 ```
