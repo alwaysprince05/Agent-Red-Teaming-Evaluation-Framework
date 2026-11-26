@@ -471,3 +471,38 @@ def test_models_module_never_logs_keys(monkeypatch):
     spec = ModelSpec("groq", "m")
     assert "gsk_secret" not in spec.label and "gsk_secret" not in repr(spec)
     assert models._PROVIDERS["groq"][1] == "GROQ_API_KEY"
+
+
+# ---------------------------------------------------------------- client robustness
+
+
+def test_chat_retries_rate_limit_then_succeeds(monkeypatch):
+    responses = [
+        httpx.Response(429, headers={"retry-after": "0"}, json={"error": "slow down"}),
+        httpx.Response(200, json={"choices": [{"message": {"content": '<think>hmm</think>{"ok": true}'}}]}),
+    ]
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: responses.pop(0))
+    monkeypatch.setattr(models.time, "sleep", lambda s: None)
+    out = models.chat(ModelSpec("ollama", "m"), [{"role": "user", "content": "hi"}])
+    assert out == '{"ok": true}'
+
+
+def test_chat_gives_up_after_retries(monkeypatch):
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: httpx.Response(429, json={}))
+    monkeypatch.setattr(models.time, "sleep", lambda s: None)
+    with pytest.raises(ModelError, match="HTTP 429"):
+        models.chat(ModelSpec("ollama", "m"), [{"role": "user", "content": "hi"}])
+
+
+def test_load_env_file_keeps_shell_values(monkeypatch, tmp_path):
+    import app as launcher
+
+    env = tmp_path / ".env"
+    env.write_text("# comment\nRT_A=from_file\nRT_B='quoted'\nbad line\n", encoding="utf-8")
+    monkeypatch.setenv("RT_A", "from_shell")
+    monkeypatch.delenv("RT_B", raising=False)
+    launcher.load_env_file(env)
+    import os
+
+    assert os.environ["RT_A"] == "from_shell" and os.environ["RT_B"] == "quoted"
+    monkeypatch.delenv("RT_B")

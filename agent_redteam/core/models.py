@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -38,6 +40,8 @@ _PROVIDERS: dict[str, tuple[str, str | None]] = {
     "custom": ("", "AGENT_REDTEAM_LLM_API_KEY"),
 }
 MAX_MODELS_PER_ROLE = 5
+MAX_RETRIES = 3
+MAX_RETRY_WAIT_S = 20.0
 
 
 class ModelError(RuntimeError):
@@ -128,19 +132,39 @@ def chat(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            resp = httpx.post(
+                spec.base_url() + "/chat/completions", json=payload, headers=headers, timeout=timeout_s
+            )
+        except httpx.HTTPError as exc:
+            raise ModelError(f"{spec.label} unreachable: {exc.__class__.__name__}") from None
+        if resp.status_code in (429, 500, 502, 503) and attempt < MAX_RETRIES:
+            # Rate limited or briefly down: wait as the provider asks, then try again.
+            time.sleep(_retry_delay(resp, attempt))
+            continue
+        if resp.status_code >= 400:
+            raise ModelError(f"{spec.label} returned HTTP {resp.status_code}")
+        try:
+            content = resp.json()["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError, ValueError):
+            raise ModelError(f"{spec.label} sent an unexpected response") from None
+        return _strip_thinking(str(content or ""))
+    raise ModelError(f"{spec.label} kept failing")  # pragma: no cover
+
+
+def _retry_delay(resp: httpx.Response, attempt: int) -> float:
     try:
-        resp = httpx.post(
-            spec.base_url() + "/chat/completions", json=payload, headers=headers, timeout=timeout_s
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-    except httpx.HTTPStatusError as exc:
-        raise ModelError(f"{spec.label} returned HTTP {exc.response.status_code}") from None
-    except httpx.HTTPError as exc:
-        raise ModelError(f"{spec.label} unreachable: {exc.__class__.__name__}") from None
-    except (KeyError, IndexError, TypeError, ValueError):
-        raise ModelError(f"{spec.label} sent an unexpected response") from None
-    return str(content or "")
+        wait = float(resp.headers.get("retry-after", ""))
+    except ValueError:
+        wait = 2.0 * (attempt + 1)
+    return max(0.5, min(wait, MAX_RETRY_WAIT_S))
+
+
+def _strip_thinking(text: str) -> str:
+    """Drop <think>...</think> reasoning that some models print before the answer."""
+    return re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.S).strip()
+
 
 
 def extract_json(text: str) -> dict:
