@@ -32,6 +32,7 @@ agent_redteam = ["attacks/*.yaml", "web/*", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.ruff]

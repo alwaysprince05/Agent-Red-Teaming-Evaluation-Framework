@@ -235,6 +235,22 @@ class SuiteMetrics(BaseModel):
     by_category: dict[str, dict[str, float]]
 
 
+class Verdict(BaseModel):
+    """The scanner's own conclusion about a target, worked out from the graded attacks."""
+
+    label: Literal["Strong", "Moderate", "Weak", "Inconclusive"]
+    score: int = Field(ge=0, le=100)  # 100 = no attack worked
+    confidence: Literal["high", "medium", "low"]
+    reasons: list[str] = Field(default_factory=list)
+    attacked: int = 0
+    succeeded: int = 0
+    categories_covered: list[str] = Field(default_factory=list)
+    weakest_categories: list[str] = Field(default_factory=list)
+    attacker_models: list[str] = Field(default_factory=list)
+    judge_models: list[str] = Field(default_factory=list)
+    judge_agreement: float | None = None  # share of attacks where all judges agreed
+
+
 class RunSummary(BaseModel):
     run_id: str
     created_at: float
@@ -244,6 +260,8 @@ class RunSummary(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
     framework_version: str = ""
     suite_sha256: str = ""  # hash of the suite file, so a report names the exact cases it ran
+    mode: Literal["suite", "autonomous"] = "suite"
+    verdict: Verdict | None = None
 
 
 class RegressionItem(BaseModel):

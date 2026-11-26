@@ -1,5 +1,5 @@
 // redteam console: a thin client over the REST API. Plain JS, no build step.
-// Routes: #/  #/scan  #/run/<id>  #/report/<id>  #/compare?a=&b=  #/playground
+// Routes: #/  #/scan  #/baseline  #/run/<id>  #/report/<id>  #/compare?a=&b=  #/playground
 
 const view = document.getElementById("view");
 let config = null;
@@ -77,6 +77,61 @@ function grade(asr) {
 function verdict(row) {
   if (row.status === "error") return '<span class="pill warn">error</span>';
   return row.violated ? '<span class="pill hit">breached</span>' : '<span class="pill ok">blocked</span>';
+}
+
+const VERDICT_TEXT = {
+  Strong: "Held up against the scanner's attacks",
+  Moderate: "Some attacks got through",
+  Weak: "Easily tricked",
+  Inconclusive: "Not enough evidence for a verdict",
+};
+
+function verdictBadge(v) {
+  return `<span class="vbadge v-${esc(v.label.toLowerCase())}">${esc(v.label)}</span>`;
+}
+
+function verdictCard(v) {
+  return `<div class="verdict v-${esc(v.label.toLowerCase())}">
+    <div class="v-top">
+      <div>
+        <div class="mono dim">Scanner verdict</div>
+        <div class="v-label">${esc(v.label)}</div>
+        <div class="dim">${esc(VERDICT_TEXT[v.label] || "")}</div>
+      </div>
+      <div class="v-score"><b class="num">${v.score}</b><span>/100</span><div class="dim">security score</div></div>
+    </div>
+    <ul class="v-reasons">${v.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+    <div class="v-meta mono dim">
+      <span>confidence: ${esc(v.confidence)}</span>
+      <span>${v.succeeded}/${v.attacked} attacks worked</span>
+      ${v.judge_agreement == null ? "" : `<span>judges agreed on ${Math.round(v.judge_agreement * 100)}%</span>`}
+      <span>attackers: ${esc(v.attacker_models.join(", "))}</span>
+      <span>judges: ${esc(v.judge_models.join(", "))}</span>
+    </div>
+  </div>`;
+}
+
+function learnedHtml(t) {
+  const p = t.profile || {};
+  const list = (xs) => (xs && xs.length ? xs.map(esc).join(", ") : '<span class="dim">none found</span>');
+  return `
+    <h2>What the scanner learned</h2>
+    <div class="card"><div class="card-b learned">
+      <div><div class="mono dim">Purpose</div><p>${esc(p.purpose || "The agent did not describe itself.")}</p></div>
+      <div><div class="mono dim">Tools and actions</div><p>${list(p.tools)}</p></div>
+      <div><div class="mono dim">Data it can reach</div><p>${list(p.sensitive_data)}</p></div>
+      <div><div class="mono dim">Defenses seen</div><p>${esc(p.defenses || "none described")}</p></div>
+    </div>
+    ${(t.recon || []).length ? `<div class="card-b" style="border-top:1px solid var(--line)">
+      <div class="mono dim" style="margin-bottom:8px">Recon questions (written by ${esc((t.recon[0] || {}).asked_by || "the attacker")})</div>
+      ${t.recon.map((r) => `<div class="qa"><b>Q</b> ${esc(r.question)}<br><b>A</b> <span class="muted">${esc(r.reply.slice(0, 400))}</span></div>`).join("")}
+    </div>` : ""}
+    ${(t.rounds || []).length ? `<div class="card-b" style="border-top:1px solid var(--line)">
+      <div class="mono dim" style="margin-bottom:8px">Attack plan, round by round</div>
+      ${t.rounds.map((r) => `<div class="qa"><b>Round ${r.round}</b> ${r.error ? `<span class="err-t">${esc(r.error)}</span>`
+        : `<span class="mono dim">${esc(r.attacker)} · ${r.written} attacks${r.rejected && r.rejected.length ? ` · ${r.rejected.length} rejected` : ""}</span><br><span class="muted">${esc(r.reasoning)}</span>`}</div>`).join("")}
+    </div>` : ""}
+    </div>`;
 }
 
 function ago(ts) {
@@ -199,14 +254,14 @@ async function renderHome() {
       <div class="hero-text">
         <span class="eyebrow">Agent security testing</span>
         <h1>Find out if your AI agent can be tricked.</h1>
-        <p class="lede">Run known attacks against an agent, grade every reply, and get a report with the proof and a fix for each problem.</p>
+        <p class="lede">Give it the URL of your agent. It studies the agent, writes its own attacks with several AI models, has other models judge every reply, and decides by itself how strong the agent is.</p>
         <div class="actions">
           <a class="btn" href="#/scan">Run a scan</a>
           <a class="btn ghost" href="#/playground">Try an attack</a>
         </div>
         <div class="facts">
-          <span><b class="num">${total}</b> attacks</span>
-          <span><b class="num">${config.categories.length}</b> categories</span>
+          <span><b class="num">${config.categories.length}</b> attack areas</span>
+          <span><b class="num">${(config.autonomous || {}).attackers ? config.autonomous.attackers.length + config.autonomous.judges.length : 0}</b> models</span>
           <span><b class="num" id="scan-count">–</b> scans run</span>
         </div>
       </div>
@@ -231,16 +286,16 @@ async function renderHome() {
 
     <h2>How it works</h2>
     <div class="card flow">
-      <div class="stage"><span class="ico ico-1">${ICONS.suite}</span><h3>Attack suite</h3><p>${total} versioned attacks, each with its own rules</p></div>
-      <div class="stage"><span class="ico ico-2">${ICONS.agent}</span><h3>Agent under test</h3><p>Demo bots, a local LLM or your own HTTP agent</p></div>
-      <div class="stage"><span class="ico ico-3">${ICONS.grader}</span><h3>Grader</h3><p>Catches leaked secrets, missing refusals and forbidden tool calls</p></div>
-      <div class="stage"><span class="ico ico-4">${ICONS.report}</span><h3>Report</h3><p>A grade, OWASP mapping, proof and fixes, as PDF or CSV</p></div>
+      <div class="stage"><span class="ico ico-2">${ICONS.agent}</span><h3>Recon</h3><p>Asks your agent what it does, which tools it has and what data it can reach</p></div>
+      <div class="stage"><span class="ico ico-1">${ICONS.suite}</span><h3>Attacker models</h3><p>Several models take turns writing attacks for this agent, round by round</p></div>
+      <div class="stage"><span class="ico ico-3">${ICONS.grader}</span><h3>Judge panel</h3><p>Other models vote on every reply; ties go to a tie-breaker</p></div>
+      <div class="stage"><span class="ico ico-4">${ICONS.report}</span><h3>Verdict</h3><p>Strong, Moderate or Weak with a score, reasons, proof and fixes</p></div>
     </div>
 
-    <h2>Attack catalog</h2>
+    <h2>Attack areas</h2>
     <div class="card">
       <table>
-        <tr><th style="width:70px">Code</th><th style="width:210px">Category</th><th>Technique</th><th style="width:130px">OWASP LLM</th><th style="width:60px;text-align:right">Cases</th></tr>
+        <tr><th style="width:70px">Code</th><th style="width:210px">Category</th><th>Technique</th><th style="width:130px">OWASP LLM</th><th style="width:90px;text-align:right">Baseline cases</th></tr>
         ${config.categories.map((c) => `
           <tr>
             <td>${catTag(c.id)}</td>
@@ -256,9 +311,9 @@ async function renderHome() {
     <div class="card safety">
       <div><h3>Fake secrets only</h3><p>Canary values and dummy keys. Nothing real can leak.</p></div>
       <div><h3>Local by default</h3><p>Scripted bots and a local model. Transcripts stay on the machine.</p></div>
-      <div><h3>Authorization gate</h3><p>URL targets need your confirmation and an allow-listed host.</p></div>
+      <div><h3>Authorization gate</h3><p>Every URL scan needs your confirmation that you own the agent.</p></div>
       <div><h3>Hard guardrail</h3><p>.gov .mil .edu .int and gov.in-style domains are always refused.</p></div>
-      <div><h3>Public demo mode</h3><p>Built-in agents only, capped scans.</p></div>
+      <div><h3>Public demo mode</h3><p>Public addresses only (no private or internal networks), capped scans.</p></div>
       <div><h3>Safe rendering</h3><p>Replies are escaped, run ids validated.</p></div>
     </div>
 
@@ -315,7 +370,7 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
       return;
     }
     el.innerHTML = `<table>
-      <tr><th>Run</th><th>Agent</th><th>Started</th><th>Result</th><th style="width:150px">Attack success</th></tr>
+      <tr><th>Run</th><th>Agent</th><th>Started</th><th>Verdict</th><th>Result</th><th style="width:150px">Attack success</th></tr>
       ${runs.slice(0, 8).map((r) => {
         const m = r.metrics;
         const href = r.status === "completed" ? `#/report/${r.run_id}` : `#/run/${r.run_id}`;
@@ -323,6 +378,7 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
           <td class="mono">${esc(r.run_id.slice(-8))}</td>
           <td>${esc(tname(r.target))}</td>
           <td class="muted">${esc(ago(r.started_at))}</td>
+          <td>${r.verdict ? verdictBadge(r.verdict) : '<span class="dim">baseline</span>'}</td>
           <td>${m ? `<span class="num">${m.violations}/${m.executed}</span> <span class="dim">breached</span>`
             : `<span class="pill${r.status === "failed" ? " warn" : " plain"}">${esc(r.status)}</span>`}</td>
           <td>${m ? `<div style="display:flex;gap:10px;align-items:center"><div class="meter${m.attack_success_rate === 0 ? " zero" : ""}" style="flex:1"><i style="width:${m.attack_success_rate * 100}%"></i></div><span class="mono num">${pct(m.attack_success_rate)}</span></div>` : ""}</td>
@@ -339,9 +395,118 @@ python app.py            <span class="dim"># http://127.0.0.1:8000</span></pre>
 
 function renderScan() {
   nav("scan");
+  const auto = config.autonomous || { available: false, attackers: [], judges: [] };
+  const maxR = auto.max_rounds || 8;
+  const maxA = auto.max_attacks_per_round || 6;
   view.innerHTML = `
-    <div class="ph"><div><div class="crumb">scans / new</div><h1>New scan</h1>
-      <p class="lede">Pick an agent and the attacks to run.</p></div></div>
+    <div class="ph"><div><div class="crumb">scans / new</div><h1>Scan an agent</h1>
+      <p class="lede">Give the URL of an agent you own. The scanner studies it, writes its own attacks with several models, and decides how strong it is.</p></div></div>
+    ${auto.available ? "" : `<div class="err">This server has no attacker or judge models set up, so autonomous scans are off.
+      Set <span class="code">AGENT_REDTEAM_ATTACKER_MODELS</span> and <span class="code">AGENT_REDTEAM_JUDGE_MODELS</span>, or use the <a href="#/baseline" style="color:var(--text)">baseline suite</a>.</div>`}
+    <div class="setup">
+      <div style="display:grid;gap:16px">
+        <div class="card"><div class="card-h"><h3>Agent</h3><span class="mono dim">${config.public_mode ? "public internet addresses only" : "any address you control"}</span></div>
+          <div class="card-b form">
+            <label>Agent URL<input type="url" id="a-url" placeholder="https://my-agent.example.com/chat" spellcheck="false" autocomplete="off"></label>
+            <label>API key <span class="dim">(optional, sent as a Bearer token, never saved)</span><input type="password" id="a-key" autocomplete="off"></label>
+            <details><summary class="dim">Advanced</summary>
+              <label>Request format<select id="a-fmt">
+                <option value="auto">Detect automatically</option>
+                <option value="openai">OpenAI chat completions</option>
+                <option value="messages">{"messages": [...]}</option>
+                <option value="message">{"message": "...", "history": [...]}</option>
+                <option value="input">{"input": "..."}</option>
+                <option value="prompt">{"prompt": "..."}</option>
+                <option value="query">{"query": "..."}</option>
+              </select></label>
+              <label>Model name <span class="dim">(OpenAI-style endpoints only)</span><input id="a-model" placeholder="leave empty if unsure"></label>
+            </details>
+            <label class="auth"><input type="checkbox" id="a-auth"> I own this agent or have written permission to test it.</label>
+            <p class="dim" style="font-size:12px;margin:0">Never scan services you do not own. Government, military, education and intergovernmental domains are always refused.</p>
+          </div>
+        </div>
+        <div class="card"><div class="card-h"><h3>Depth</h3></div>
+          <div class="card-b form two">
+            <label>Rounds<input type="number" id="a-rounds" min="1" max="${maxR}" value="${Math.min(3, maxR)}"></label>
+            <label>Attacks per round<input type="number" id="a-per" min="1" max="${maxA}" value="${Math.min(4, maxA)}"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Areas to probe</h3>
+            <span><button class="btn ghost sm" id="all">All</button> <button class="btn ghost sm" id="none">None</button></span></div>
+          ${config.categories.map((c) => `
+            <label class="opt">
+              <input type="checkbox" name="cat" value="${esc(c.id)}" checked>
+              <div><h3>${esc(c.label)}</h3><div class="d">${esc(CATS[c.id] ? CATS[c.id].desc : "")}</div></div>
+              <span class="tag cat-${esc(c.id)}">${code(c.id)}</span>
+            </label>`).join("")}
+        </div>
+      </div>
+      <div class="card sticky">
+        <div class="card-h"><h3>How this scan works</h3></div>
+        <div class="card-b">
+          <ol class="steps">
+            <li>Asks the agent what it does</li>
+            <li>Attacker models write attacks for it</li>
+            <li>Judge models vote on every reply</li>
+            <li>Scanner gives its verdict</li>
+          </ol>
+          <div class="summary-row"><span>Attackers</span><span class="mono">${esc(auto.attackers.join(", ") || "none")}</span></div>
+          <div class="summary-row"><span>Judges</span><span class="mono">${esc(auto.judges.join(", ") || "none")}</span></div>
+          <div class="summary-row"><span>Up to</span><span class="num" id="s-max"></span></div>
+          <button class="btn" id="start" style="width:100%;justify-content:center;margin-top:14px">Start scan</button>
+          <div id="scan-err"></div>
+          <p class="dim" style="font-size:12px;margin-top:12px">Want the old fixed test list? <a href="#/baseline" style="color:var(--text)">Baseline suite</a></p>
+        </div>
+      </div>
+    </div>`;
+
+  const picked = () => [...view.querySelectorAll("input[name=cat]:checked")].map((x) => x.value);
+  const val = (id) => document.getElementById(id).value.trim();
+  const update = () => {
+    const rounds = Number(val("a-rounds")) || 0;
+    const per = Number(val("a-per")) || 0;
+    document.getElementById("s-max").textContent = `${rounds * per} attacks`;
+    const ok = auto.available && /^https?:\/\/[^\s/]+/i.test(val("a-url")) && document.getElementById("a-auth").checked
+      && picked().length > 0 && rounds >= 1 && rounds <= maxR && per >= 1 && per <= maxA;
+    document.getElementById("start").disabled = !ok;
+  };
+  view.querySelectorAll("input,select").forEach((i) => { i.addEventListener("change", update); i.addEventListener("input", update); });
+  document.getElementById("all").onclick = () => { view.querySelectorAll("input[name=cat]").forEach((i) => { i.checked = true; }); update(); };
+  document.getElementById("none").onclick = () => { view.querySelectorAll("input[name=cat]").forEach((i) => { i.checked = false; }); update(); };
+  update();
+
+  document.getElementById("start").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    const cats = picked();
+    const body = {
+      target_url: val("a-url"),
+      authorized: document.getElementById("a-auth").checked,
+      api_key: val("a-key") || null,
+      request_format: val("a-fmt"),
+      model: val("a-model") || null,
+      max_rounds: Number(val("a-rounds")),
+      attacks_per_round: Number(val("a-per")),
+      categories: cats.length === config.categories.length ? [] : cats,
+    };
+    btn.disabled = true;
+    btn.textContent = "Starting…";
+    try {
+      const res = await api("/scans", { method: "POST", body: JSON.stringify(body) });
+      location.hash = `#/run/${res.run_id}`;
+    } catch (e) {
+      document.getElementById("scan-err").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = "Start scan";
+    }
+  });
+}
+
+function renderBaseline() {
+  nav("scan");
+  view.innerHTML = `
+    <div class="ph"><div><div class="crumb"><a href="#/scan">scans</a> / baseline</div><h1>Baseline suite</h1>
+      <p class="lede">Replay the fixed regression suite. For a real assessment use an <a href="#/scan" style="color:var(--text)">autonomous scan</a>.</p></div></div>
     <div class="setup">
       <div style="display:grid;gap:16px">
         <div class="card">
@@ -467,6 +632,7 @@ function renderRun(runId) {
           <div class="hit"><b class="num" id="c-hit">0</b><span>breached</span></div>
           <div class="ok"><b class="num" id="c-ok">0</b><span>blocked</span></div>
         </div>
+        <div class="card-b stage-box" id="run-stage" hidden></div>
         <div class="card-b" id="run-done" style="border-top:1px solid var(--line);display:none"></div>
       </div>
     </div>`;
@@ -496,7 +662,7 @@ function renderRun(runId) {
     if (started === null) {
       const s = await api(`/runs/${encodeURIComponent(runId)}`).catch(() => null);
       started = s ? s.started_at : Date.now() / 1000;
-      if (s) document.getElementById("run-agent").textContent = `${tname(s.target)} · ${s.target}`;
+      if (s) document.getElementById("run-agent").textContent = tname(s.target) === s.target ? s.target : `${tname(s.target)} · ${s.target}`;
     }
     if (data.cases.length && !verdicts.length) log.innerHTML = "";
     for (const row of data.cases) {
@@ -508,19 +674,35 @@ function renderRun(runId) {
     document.getElementById("c-sent").textContent = verdicts.length;
     document.getElementById("c-hit").textContent = hit;
     document.getElementById("c-ok").textContent = verdicts.filter((v) => v === "ok").length;
-    document.getElementById("run-step").textContent = `${verdicts.length} / ${data.total} cases`;
-    paintStrip(data.total, data.status === "running");
+    const autonomous = data.mode === "autonomous";
+    document.getElementById("run-step").textContent = autonomous
+      ? `${verdicts.length} attacks graded · up to ${data.total}`
+      : `${verdicts.length} / ${data.total} cases`;
+    paintStrip(Math.max(data.total, verdicts.length), data.status === "running");
+    if (autonomous) {
+      const box = document.getElementById("run-stage");
+      box.hidden = false;
+      box.innerHTML = `<div class="mono dim" style="margin-bottom:6px">What the scanner is doing</div>
+        <ul class="stage-log">${(data.log || []).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`;
+      if (data.cases.length === 0 && !verdicts.length && data.status === "running") {
+        log.innerHTML = `<div class="empty">${esc(data.stage || "Starting")}…</div>`;
+      }
+    }
 
     if (data.status === "running") {
-      document.getElementById("run-title").textContent = `Running case ${Math.min(verdicts.length + 1, data.total)} of ${data.total}`;
-      pollTimer = setTimeout(tick, 500);
+      document.getElementById("run-title").textContent = autonomous
+        ? (data.stage || "Scanning…")
+        : `Running case ${Math.min(verdicts.length + 1, data.total)} of ${data.total}`;
+      pollTimer = setTimeout(tick, autonomous ? 1500 : 500);
       return;
     }
     const done = document.getElementById("run-done");
     done.style.display = "block";
     if (data.status === "completed") {
-      document.getElementById("run-title").textContent = "Scan complete";
-      done.innerHTML = `<a class="btn" style="width:100%;justify-content:center" href="#/report/${esc(runId)}">Open report</a>`;
+      document.getElementById("run-title").textContent = data.verdict ? `Verdict: ${data.verdict.label}` : "Scan complete";
+      done.innerHTML = (data.verdict ? `<div style="margin-bottom:12px">${verdictBadge(data.verdict)}
+          <span class="num" style="margin-left:8px">${data.verdict.score}/100</span></div>` : "")
+        + `<a class="btn" style="width:100%;justify-content:center" href="#/report/${esc(runId)}">Open report</a>`;
     } else {
       document.getElementById("run-title").textContent = "Scan failed";
       done.innerHTML = `<div class="err" style="margin:0">${esc(data.error || "unknown error")}</div>`;
@@ -568,15 +750,19 @@ async function renderReport(runId) {
       <div class="card-b">
         <div class="mono dim">Agent red-team assessment · run ${esc(runId)}</div>
         <h3 style="margin:6px 0 10px">Executive summary</h3>
+        ${d.verdict ? `<p><b>Scanner verdict: ${esc(d.verdict.label)}</b> (security score ${d.verdict.score}/100, ${esc(d.verdict.confidence)} confidence). ${esc(d.verdict.reasons.join(". "))}.</p>` : ""}
         <p><b>${esc(tname(d.target))}</b> was tested on ${esc(when)} with ${m.executed} attacks across
           ${Object.keys(m.by_category).length} categories. <b>${m.violations}</b> succeeded, an attack success rate of
           <b>${pct(m.attack_success_rate)}</b> (grade ${g.letter}: ${esc(g.text.toLowerCase())}).
           ${d.findings.length ? `Findings: ${sevCount("critical")} critical, ${sevCount("high")} high, ${sevCount("medium")} medium.` : "No findings."}
           ${hitCats.length ? `Most affected: ${esc(hitCats.join(", "))}.` : ""}</p>
         ${fixes.length ? `<h3 style="margin:14px 0 6px">Priority fixes</h3><ol>${fixes.map((x) => `<li><b>${esc(x.cat)}</b> (${esc(x.sev)}): ${esc(x.text)}</li>`).join("")}</ol>` : ""}
-        <p class="dim" style="margin-top:12px;font-size:12px">Scope: ${esc(d.target)} · ${esc(stamp || "")} · deterministic policy grading · findings mapped to the OWASP Top 10 for LLM Applications (2025).</p>
+        <p class="dim" style="margin-top:12px;font-size:12px">Scope: ${esc(d.target)} · ${esc(stamp || "")} · ${d.mode === "autonomous" ? "attacks written by attacker models, graded by a judge-model panel" : "deterministic policy grading"} · findings mapped to the OWASP Top 10 for LLM Applications (2025).</p>
       </div>
     </section>
+
+    ${d.verdict ? verdictCard(d.verdict) : ""}
+    ${d.trace ? learnedHtml(d.trace) : ""}
 
     <div class="card">
       <div class="score">
@@ -620,7 +806,7 @@ async function renderReport(runId) {
         </div>
         <div class="detail">${detailHtml({ ...row, remediation: f.remediation })}</div>
       </div>`;
-    }).join("") : '<div class="empty">Nothing got through. No findings for this suite.</div>'}</div>
+    }).join("") : `<div class="empty">Nothing got through. No findings for this ${d.mode === "autonomous" ? "scan" : "suite"}.</div>`}</div>
 
     <div class="no-print">
       <h2>All cases · ${d.cases.length}</h2>
@@ -982,6 +1168,7 @@ function route() {
   const parts = path.split("/").filter(Boolean);
   window.scrollTo(0, 0);
   if (parts[0] === "scan") return renderScan();
+  if (parts[0] === "baseline") return renderBaseline();
   if (parts[0] === "run" && parts[1]) return renderRun(parts[1]);
   if (parts[0] === "report" && parts[1]) return renderReport(parts[1]);
   if (parts[0] === "compare") return renderCompare(query);
