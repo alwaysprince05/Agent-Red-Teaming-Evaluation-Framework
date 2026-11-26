@@ -30,8 +30,20 @@ their terms of service, and is outside the intended use of this project.
 - It does not exploit, persist, or pivot: a "successful attack" is a recorded policy
   violation in a captured response, nothing more.
 - It does not bypass authentication, rate limits, or monitoring of any target.
-- It does not generate adaptive/mutating attacks automatically (future work; each case is
-  a fixed, reviewed, version-controlled script).
+- Autonomous scans do generate attacks automatically, with attacker models. Those attacks
+  only test whether the agent breaks its own rules: the attacker is told never to include
+  real personal data, malware or real-world harm, every attack is capped in length and
+  number, and the full text of every attack is kept in the report for review.
+
+## Autonomous scans of a URL
+
+- Scan only agents you own or have written permission to test. The scanner asks you to
+  confirm this for every scan, and you are responsible for that confirmation.
+- Do not scan public AI products (chat assistants, app builders, other companies' bots)
+  without the owner's written permission, even if they are reachable from the internet.
+- The agent's API key is held in memory for the scan only and never written to disk.
+- On the public demo, private, internal and cloud-metadata addresses are refused, and the
+  number of rounds and attacks is capped.
 
 ## Evidence handling
 
