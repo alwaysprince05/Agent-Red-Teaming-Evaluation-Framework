@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import string
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -155,6 +157,30 @@ def _parse_args(raw: object) -> dict[str, Any]:
     return {}
 
 
+MAX_RETRIES = 4
+MAX_RETRY_WAIT_S = 20.0
+
+
+def _post_with_retry(url: str, payload: dict[str, Any], headers: dict[str, str]) -> httpx.Response:
+    """Call the model, waiting and retrying when the provider rate-limits or briefly fails."""
+    for attempt in range(MAX_RETRIES + 1):
+        resp = httpx.post(url, json=payload, headers=headers, timeout=90)
+        if resp.status_code in (429, 500, 502, 503) and attempt < MAX_RETRIES:
+            try:
+                wait = float(resp.headers.get("retry-after", ""))
+            except ValueError:
+                wait = 2.0 * (attempt + 1)
+            time.sleep(max(0.5, min(wait, MAX_RETRY_WAIT_S)))
+            continue
+        resp.raise_for_status()
+        return resp
+    raise httpx.HTTPError("model kept failing")  # pragma: no cover
+
+
+def _strip_thinking(text: str) -> str:
+    return re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.S).strip()
+
+
 def run_agent(spec: AgentSpec, history: list[dict[str, str]]) -> tuple[str, list[dict[str, Any]]]:
     """Answer the last user message. Returns (reply, tool calls made)."""
     base = os.getenv("TARGETS_LLM_BASE_URL", "http://127.0.0.1:11434/v1").rstrip("/")
@@ -167,17 +193,15 @@ def run_agent(spec: AgentSpec, history: list[dict[str, str]]) -> tuple[str, list
         messages.append({"role": role, "content": str(m.get("content", ""))[:4000]})
     calls: list[dict[str, Any]] = []
     for _ in range(3):
-        resp = httpx.post(
+        resp = _post_with_retry(
             f"{base}/chat/completions",
-            json={"model": spec.model, "messages": messages, "tools": spec.tools, "temperature": 0.3},
-            headers=headers,
-            timeout=90,
+            {"model": spec.model, "messages": messages, "tools": spec.tools, "temperature": 0.3},
+            headers,
         )
-        resp.raise_for_status()
         message = resp.json()["choices"][0]["message"]
         tool_calls = message.get("tool_calls") or []
         if not tool_calls:
-            return str(message.get("content") or ""), calls
+            return _strip_thinking(str(message.get("content") or "")), calls
         messages.append(
             {"role": "assistant", "content": message.get("content") or "", "tool_calls": tool_calls}
         )

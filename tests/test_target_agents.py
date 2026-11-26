@@ -68,3 +68,22 @@ def test_scanner_adapter_detects_each_shape(client, monkeypatch):
         r = ad.send([Turn(content="ping")])
         assert r.error is None and r.text.endswith("ping"), (path, r)
         assert ad.request_format == fmt
+
+
+def test_model_call_retries_rate_limit(monkeypatch):
+    import httpx
+
+    import target_agents.agents as agents
+
+    replies = [
+        httpx.Response(429, headers={"retry-after": "0"}, json={}, request=httpx.Request("POST", "http://m")),
+        httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "<think>x</think>Hello"}}]},
+            request=httpx.Request("POST", "http://m"),
+        ),
+    ]
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: replies.pop(0))
+    monkeypatch.setattr(agents.time, "sleep", lambda s: None)
+    reply, calls = agents.run_agent(build_agents()["hr"], [{"role": "user", "content": "hi"}])
+    assert reply == "Hello" and calls == []

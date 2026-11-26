@@ -336,7 +336,7 @@ class ScanRequest(BaseModel):
     max_rounds: int = Field(default=3, ge=1, le=8)
     attacks_per_round: int = Field(default=4, ge=1, le=6)
     categories: list[str] = Field(default_factory=list)
-    timeout_s: float = Field(default=60.0, gt=0, le=180)
+    timeout_s: float = Field(default=120.0, gt=0, le=180)
 
 
 def _scan_adapter(req: ScanRequest):
