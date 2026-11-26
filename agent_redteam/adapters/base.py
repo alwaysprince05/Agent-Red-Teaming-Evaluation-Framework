@@ -117,11 +117,47 @@ def validate_external_target(
     return url
 
 
+def validate_public_target(url: str) -> str:
+    """Stricter check for URLs typed into the public demo.
+
+    Besides the protected-domain rule, every address the host resolves to must be a
+    public internet address. Loopback, private (10.x, 192.168.x, ...), link-local
+    (including cloud metadata at 169.254.169.254), carrier-grade NAT and reserved
+    ranges are refused, so the hosted scanner cannot be pointed at its own network.
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise TargetNotAuthorizedError("only http and https agent URLs can be scanned")
+    if parts.username or parts.password:
+        raise TargetNotAuthorizedError("put credentials in the API key field, not in the URL")
+    host = parts.hostname or ""
+    if not host:
+        raise TargetNotAuthorizedError("target URL has no hostname")
+    if is_protected_host(host):
+        raise TargetNotAuthorizedError(
+            f"refusing target {host!r}: government, military, education and intergovernmental "
+            "domains are blocked by a built-in guardrail that cannot be turned off"
+        )
+    try:
+        infos = socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80))
+    except (socket.gaierror, UnicodeError):
+        raise TargetNotAuthorizedError(f"cannot resolve host {host!r}") from None
+    for info in infos:
+        address = ipaddress.ip_address(info[4][0])
+        if not address.is_global or address.is_multicast:
+            raise TargetNotAuthorizedError(
+                f"refusing {host!r}: it points to a private or internal address, "
+                "which the public demo never scans"
+            )
+    return url
+
+
 def resolve_target(
     spec: str,
     *,
     allow_external: bool = False,
     host_allowlist: list[str] | None = None,
+    http_options: dict | None = None,
 ) -> AgentAdapter:
     """Resolve a target spec into an adapter.
 
@@ -145,7 +181,7 @@ def resolve_target(
         validate_external_target(spec, allow_external=allow_external, host_allowlist=host_allowlist)
         from agent_redteam.adapters.http_agent import HTTPAgentAdapter
 
-        return HTTPAgentAdapter(url=spec)
+        return HTTPAgentAdapter(url=spec, **(http_options or {}))
     raise ValueError(
         f"unknown target spec {spec!r}; use 'mock:weak', 'mock:strong', 'llm:weak', 'llm:strong' "
         "or an authorized http(s) URL"

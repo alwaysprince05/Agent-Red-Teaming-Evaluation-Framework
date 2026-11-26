@@ -161,6 +161,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print the adaptive report as JSON",
     )
 
+    scan = sub.add_parser(
+        "scan",
+        help="Autonomous scan: study the agent at a URL, write attacks with models, give a verdict",
+    )
+    scan.add_argument("url", help="Agent URL (you must own it or have written permission)")
+    scan.add_argument("--authorized", action="store_true",
+                      help="Confirm you own this agent or have written permission to test it")
+    scan.add_argument("--api-key-env", default="",
+                      help="Name of an environment variable holding the agent's API key")
+    scan.add_argument("--format", default="auto", dest="request_format",
+                      help="auto, openai, messages, message, input, prompt or query")
+    scan.add_argument("--model", default=None, help="Model name for OpenAI-style endpoints")
+    scan.add_argument("--rounds", type=int, default=3)
+    scan.add_argument("--attacks-per-round", type=int, default=4)
+    scan.add_argument("--timeout", type=float, default=60.0)
+    scan.add_argument("--out", default="runs")
+    scan.add_argument("--json", action="store_true", dest="as_json", help="Print the summary as JSON")
+
     sub.add_parser("list-attacks", help="List built-in adversarial suites")
     return p
 
@@ -423,6 +441,51 @@ def cmd_adaptive(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_scan(args: argparse.Namespace) -> int:
+    import os
+
+    from agent_redteam.adapters.base import validate_external_target
+    from agent_redteam.adapters.http_agent import HTTPAgentAdapter
+    from agent_redteam.core.autoscan import AutonomousScanner, AutoScanConfig, ScanError
+
+    if not args.authorized:
+        print("ERROR: add --authorized to confirm you own this agent or have written permission "
+              "to test it", file=sys.stderr)
+        return 2
+    try:
+        validate_external_target(args.url, allow_external=True, host_allowlist=None)
+        adapter = HTTPAgentAdapter(
+            args.url,
+            timeout_s=args.timeout,
+            api_key=os.getenv(args.api_key_env) if args.api_key_env else None,
+            request_format=args.request_format,
+            model=args.model,
+        )
+        scanner = AutonomousScanner(
+            adapter,
+            args.url,
+            AutoScanConfig(max_rounds=args.rounds, attacks_per_round=args.attacks_per_round,
+                           timeout_s=args.timeout, output_dir=Path(args.out)),
+            on_status=None if args.as_json else (lambda text: print(f"  {text}", flush=True)),
+            on_case=None if args.as_json else (lambda case, _rec, res: print(
+                f"    {case.id:11s} {case.category.value:24s} "
+                f"{'WORKED' if res.violated else res.status.value}", flush=True)),
+        )
+        summary = scanner.run()
+    except (TargetNotAuthorizedError, ScanError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    v = summary.verdict
+    if args.as_json:
+        print(summary.model_dump_json(indent=2))
+    else:
+        print(f"\nVerdict: {v.label}  (security score {v.score}/100, confidence {v.confidence})")
+        for reason in v.reasons:
+            print(f"  - {reason}")
+        print(f"Run {summary.run_id} saved under {args.out}/{summary.run_id}/")
+    return 1 if v.label in ("Weak", "Moderate") else 0
+
+
 def cmd_list_attacks(_args: argparse.Namespace) -> int:
     print("Built-in suites:")
     for name, path in BUILTIN_SUITES.items():
@@ -442,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
         "benchmark": cmd_benchmark,
         "generate": cmd_generate,
         "adaptive": cmd_adaptive,
+        "scan": cmd_scan,
         "list-attacks": cmd_list_attacks,
     }
     return handlers[args.command](args)

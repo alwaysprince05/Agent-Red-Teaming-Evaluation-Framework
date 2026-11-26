@@ -314,6 +314,154 @@ def start_run(req: RunRequest) -> RunCreated:
     return RunCreated(run_id=run_id, status="running", poll_url=f"/runs/{run_id}")
 
 
+_PUBLIC_MAX_ROUNDS = 3
+_PUBLIC_MAX_ATTACKS = 4
+
+
+class ScanRequest(BaseModel):
+    """An autonomous scan: the scanner studies the agent at this URL, writes its own
+    attacks with its attacker models, and decides how strong the agent is."""
+
+    target_url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=8, max_length=500)]
+    authorized: bool = Field(default=False, description="You own this agent or have written permission")
+    api_key: str | None = Field(
+        default=None, max_length=500, description="Sent as a Bearer token; never stored"
+    )
+    request_format: str = Field(
+        default="auto", description="auto, openai, messages, message, input, prompt, query"
+    )
+    model: str | None = Field(
+        default=None, max_length=100, description="Model name for OpenAI-style endpoints"
+    )
+    max_rounds: int = Field(default=3, ge=1, le=8)
+    attacks_per_round: int = Field(default=4, ge=1, le=6)
+    categories: list[str] = Field(default_factory=list)
+    timeout_s: float = Field(default=60.0, gt=0, le=180)
+
+
+def _scan_adapter(req: ScanRequest):
+    from agent_redteam.adapters.base import validate_external_target, validate_public_target
+    from agent_redteam.adapters.http_agent import HTTPAgentAdapter
+
+    if not req.authorized:
+        raise TargetNotAuthorizedError(
+            "confirm that you own this agent or have written permission to test it"
+        )
+    if public_mode():
+        validate_public_target(req.target_url)
+    else:
+        validate_external_target(req.target_url, allow_external=True, host_allowlist=None)
+    return HTTPAgentAdapter(
+        req.target_url,
+        timeout_s=req.timeout_s,
+        api_key=req.api_key or None,
+        request_format=req.request_format,
+        model=req.model,
+    )
+
+
+def _execute_scan(run_id: str, req: ScanRequest, adapter) -> None:
+    from agent_redteam.core.autoscan import AutonomousScanner, AutoScanConfig, ScanError
+
+    def on_case(case: TestCase, record: ExecutionRecord, result: EvaluationResult) -> None:
+        row = _case_row(record, result, case)
+        row["written_by"] = case.metadata.get("written_by", "")
+        with _LOCK:
+            _EVENTS.setdefault(run_id, []).append(row)
+            _RUNS[run_id]["done"] = len(_EVENTS[run_id])
+
+    def on_status(text: str) -> None:
+        with _LOCK:
+            _RUNS[run_id]["stage"] = text
+            _RUNS[run_id].setdefault("log", []).append(text)
+
+    try:
+        scanner = AutonomousScanner(
+            adapter,
+            _display_target(req.target_url),
+            AutoScanConfig(
+                max_rounds=req.max_rounds,
+                attacks_per_round=req.attacks_per_round,
+                categories=req.categories or list(_CATEGORY_LABELS),
+                timeout_s=req.timeout_s,
+                output_dir=Path("runs"),
+            ),
+            on_case=on_case,
+            on_status=on_status,
+        )
+        summary = scanner.run(run_id)
+        with _LOCK:
+            _RUNS[run_id].update(
+                status="completed",
+                finished_at=time.time(),
+                metrics=summary.metrics.model_dump(),
+                findings_count=len(summary.findings),
+                verdict=summary.verdict.model_dump() if summary.verdict else None,
+                stage="Done",
+            )
+    except (ScanError, TargetNotAuthorizedError, ValueError) as exc:
+        with _LOCK:
+            _RUNS[run_id].update(status="failed", error=str(exc), finished_at=time.time())
+    except Exception as exc:  # unexpected
+        with _LOCK:
+            _RUNS[run_id].update(status="failed", error=f"internal error: {exc}", finished_at=time.time())
+
+
+def _display_target(url: str) -> str:
+    """The URL without query string or credentials, for reports."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{host}{port}{parts.path}"
+
+
+@app.post("/scans", response_model=RunCreated, status_code=202)
+def start_scan(req: ScanRequest) -> RunCreated:
+    from agent_redteam.core.models import models_for
+
+    unknown = sorted(set(req.categories) - set(_CATEGORY_LABELS))
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"unknown categories: {', '.join(unknown)}")
+    if not models_for("attacker") or not models_for("judge"):
+        raise HTTPException(
+            status_code=503,
+            detail="no attacker or judge model is configured on this server "
+            "(set AGENT_REDTEAM_ATTACKER_MODELS and AGENT_REDTEAM_JUDGE_MODELS)",
+        )
+    if public_mode():
+        req.max_rounds = min(req.max_rounds, _PUBLIC_MAX_ROUNDS)
+        req.attacks_per_round = min(req.attacks_per_round, _PUBLIC_MAX_ATTACKS)
+    try:
+        adapter = _scan_adapter(req)
+    except (TargetNotAuthorizedError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    run_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
+    with _LOCK:
+        if public_mode():
+            active = sum(1 for e in _RUNS.values() if e["status"] == "running")
+            if active >= _PUBLIC_MAX_ACTIVE_RUNS:
+                raise HTTPException(
+                    status_code=429, detail="too many scans are running right now, try again shortly"
+                )
+        _RUNS[run_id] = {
+            "status": "running",
+            "mode": "autonomous",
+            "started_at": time.time(),
+            "target": _display_target(req.target_url),
+            "output_dir": "runs",
+            "categories": req.categories,
+            "total": req.max_rounds * req.attacks_per_round,
+            "done": 0,
+            "stage": "Starting",
+            "log": [],
+        }
+        _EVENTS[run_id] = []
+        _prune_runs()
+    threading.Thread(target=_execute_scan, args=(run_id, req, adapter), daemon=True).start()
+    return RunCreated(run_id=run_id, status="running", poll_url=f"/runs/{run_id}")
+
+
 def _runs_on_disk(base: Path, skip: set[str], limit: int) -> list[dict]:
     """Finished runs saved under runs/, so the list survives a server restart."""
     if not base.is_dir():
@@ -338,6 +486,8 @@ def _runs_on_disk(base: Path, skip: set[str], limit: int) -> list[dict]:
             "output_dir": str(base),
             "metrics": summary.metrics.model_dump(),
             "findings_count": len(summary.findings),
+            "mode": summary.mode,
+            "verdict": summary.verdict.model_dump() if summary.verdict else None,
         })
     return out
 
@@ -374,6 +524,10 @@ def run_progress(run_id: str, since: int = 0) -> dict:
             "total": entry.get("total", 0),
             "done": len(events),
             "cases": events[max(since, 0):],
+            "mode": entry.get("mode", "suite"),
+            "stage": entry.get("stage"),
+            "log": entry.get("log", [])[-12:],
+            "verdict": entry.get("verdict"),
         }
 
 
@@ -450,7 +604,20 @@ def run_details(run_id: str, output_dir: str | None = None) -> dict:
         "cases": rows,
         "framework_version": summary.framework_version,
         "suite_sha256": summary.suite_sha256,
+        "mode": summary.mode,
+        "verdict": summary.verdict.model_dump() if summary.verdict else None,
+        "trace": _read_trace(base),
     }
+
+
+def _read_trace(base: Path) -> dict | None:
+    path = base / "scan_trace.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 @app.get("/runs/{run_id}/report")
@@ -584,10 +751,25 @@ def config() -> dict:
         "public_mode": public_mode(),
         "targets": _available_targets(),
         "llm_configured": _llm_configured(),
+        "autonomous": _autonomous_config(),
         "categories": [
             {"id": k, "label": v, "count": counts.get(k, 0), "owasp": owasp_entries(k)}
             for k, v in _CATEGORY_LABELS.items()
         ],
+    }
+
+
+def _autonomous_config() -> dict:
+    from agent_redteam.core.models import models_for
+
+    attackers = [m.label for m in models_for("attacker")]
+    judges = [m.label for m in models_for("judge")]
+    return {
+        "available": bool(attackers and judges),
+        "attackers": attackers,
+        "judges": judges,
+        "max_rounds": _PUBLIC_MAX_ROUNDS if public_mode() else 8,
+        "max_attacks_per_round": _PUBLIC_MAX_ATTACKS if public_mode() else 6,
     }
 
 
