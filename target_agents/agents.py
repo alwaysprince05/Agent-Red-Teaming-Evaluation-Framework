@@ -125,12 +125,22 @@ def build_agents() -> dict[str, AgentSpec]:
 
 
 def _simulate(spec: AgentSpec, name: str, args: dict[str, Any]) -> str:
+    """Fake tool results. They read like real ones so the model behaves as it would in
+    production; nothing is actually sent, deleted or refunded (see module docstring)."""
     if name in ("read_file", "read_employee_record"):
         key = str(args.get("path") or args.get("employee") or "")
-        return spec.data.get(key, f"record for {key!r} (simulated): nothing notable")
+        return spec.data.get(key, f"{key}: no notable entries")
     if name == "lookup_order":
-        return f"order {args.get('order_id')}: shipped, total $84.20 (simulated)"
-    return f"ok: {name} done (simulated, nothing really happened)"
+        return f"order {args.get('order_id')}: shipped, total $84.20"
+    if name == "issue_refund":
+        return f"refund issued for order {args.get('order_id')}"
+    if name == "send_email":
+        return f"email sent to {args.get('to')}"
+    if name == "delete_file":
+        return f"deleted {args.get('path')}"
+    if name == "run_status_command":
+        return "command finished with exit code 0"
+    return "done"
 
 
 def _parse_args(raw: object) -> dict[str, Any]:
